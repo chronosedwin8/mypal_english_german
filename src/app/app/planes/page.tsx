@@ -70,7 +70,7 @@ async function Plans({ searchParams }: { searchParams: Promise<Record<string, st
           </div>
           {!sub.cancelAtPeriodEnd && (
             <form action={cancelSubscription}>
-              <Button variant="outline" className="rounded-full">Cancelar renovación</Button>
+              <Button type="submit" variant="outline" className="rounded-full">Cancelar renovación</Button>
             </form>
           )}
         </section>
@@ -107,7 +107,7 @@ async function Plans({ searchParams }: { searchParams: Promise<Record<string, st
                 <form action={startCheckout} className="mt-6">
                   <input type="hidden" name="kind" value="plan" />
                   <input type="hidden" name="itemId" value={plan.id} />
-                  <Button className="h-11 w-full rounded-full" variant={plan.highlight ? "default" : "outline"} disabled={current}>
+                  <Button type="submit" className="h-11 w-full rounded-full" variant={plan.highlight ? "default" : "outline"} disabled={current}>
                     {current ? "Tu plan actual" : `Elegir ${plan.nameEs}`}
                   </Button>
                 </form>
@@ -131,7 +131,7 @@ async function Plans({ searchParams }: { searchParams: Promise<Record<string, st
                 <p className="font-semibold">{t.nameEs}</p>
                 <p className="text-sm text-muted-foreground">{formatUsd(t.priceUsdCents)} · válida {t.validityDays} días</p>
               </div>
-              <Button variant="outline" className="rounded-full" disabled={!sub}>
+              <Button type="submit" variant="outline" className="rounded-full" disabled={!sub}>
                 Comprar
               </Button>
             </form>

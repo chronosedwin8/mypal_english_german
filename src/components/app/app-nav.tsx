@@ -13,8 +13,15 @@ const ITEMS = [
   { href: "/app/planes", label: "Planes", icon: SparklesIcon },
 ];
 
-export function AppNav() {
-  const path = usePathname();
+export function AppNav(props: { static?: boolean }) {
+  return props.static ? <Nav path="" /> : <ActiveNav />;
+}
+
+function ActiveNav() {
+  return <Nav path={usePathname()} />;
+}
+
+function Nav({ path }: { path: string }) {
   return (
     <nav aria-label="Aplicación" className="fixed inset-x-0 bottom-0 z-40 flex justify-around border-t bg-background/95 py-1 backdrop-blur md:static md:ml-4 md:justify-start md:gap-1 md:border-0 md:bg-transparent md:py-0">
       {ITEMS.map((item) => {

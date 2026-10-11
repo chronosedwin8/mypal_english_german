@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -30,6 +31,7 @@ export async function confirmFakePayment(formData: FormData) {
   const parsed = fakePayments.parseCheckout(ref, sig, user.id);
   if (!parsed) redirect("/app/planes?motivo=pago-invalido");
   await fakePayments.completeCheckout(ref, user.id);
+  revalidatePath("/app", "layout");
   redirect(`/app/planes?pagado=${parsed.kind}`);
 }
 
@@ -44,5 +46,6 @@ export async function cancelSubscription() {
     externalSubscriptionId: sub.externalId,
     atPeriodEnd: true,
   });
+  revalidatePath("/app", "layout");
   redirect("/app/planes?cancelado=1");
 }

@@ -57,7 +57,7 @@ async function Checkout({ searchParams }: { searchParams: Promise<Record<string,
         <form action={confirmFakePayment} className="mt-6">
           <input type="hidden" name="ref" value={ref} />
           <input type="hidden" name="sig" value={sig} />
-          <Button className="h-12 w-full rounded-full text-base">
+          <Button type="submit" className="h-12 w-full rounded-full text-base">
             <CreditCardIcon /> Pagar (simulado)
           </Button>
         </form>

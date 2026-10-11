@@ -106,6 +106,7 @@ export function TutorRoom({
         body: JSON.stringify({ reason, endToken: session.endToken }),
       }).catch(() => undefined);
       router.push(`/app/clase/${session.id}/resumen`);
+      router.refresh();
     },
     [router, session],
   );
