@@ -142,7 +142,7 @@ model User {
   /// STUDENT | ADMIN (string para que Better Auth lo escriba sin enums)
   role           String    @default("STUDENT")
   /// minusculas y, en gmail, sin puntos ni +etiqueta: evita pruebas gratis repetidas
-  emailCanonical String?   @unique
+  emailCanonical String?
   bannedAt       DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
@@ -162,6 +162,7 @@ model User {
   lessonProgress     LessonProgress[]
   corrections        SessionCorrection[]
 
+  @@index([emailCanonical])
   @@map("user")
 }
 

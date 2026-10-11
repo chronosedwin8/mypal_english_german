@@ -46,7 +46,7 @@ export const PLANS: readonly PlanDef[] = [
     features: [
       "20 min con tu tutor IA",
       "Clases de hasta 10 min",
-      "Inglés 🇺🇸 🇬🇧 y alemán 🇩🇪",
+      "Inglés (EE. UU. y Reino Unido) y alemán",
       "Vocabulario y repaso ilimitados",
     ],
   },
