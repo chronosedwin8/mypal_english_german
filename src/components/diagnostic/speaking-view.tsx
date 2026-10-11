@@ -46,12 +46,8 @@ export function SpeakingView({
     stream.current = null;
   };
 
-  useEffect(() => {
-    setRec("idle");
-    setBlob(null);
-    setElapsed(0);
-    return cleanup;
-  }, [task.id]);
+  // El padre monta una vista nueva por tarea (key = task.id); al salir se libera el microfono.
+  useEffect(() => cleanup, []);
 
   async function start() {
     setError(null);

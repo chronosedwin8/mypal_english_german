@@ -22,7 +22,6 @@ export default function LivePage() {
 async function Live() {
   await requireAdmin();
   const { sessions, slots, queue } = await liveOverview();
-  const now = Date.now();
   return (
     <div className="space-y-8">
       <AutoRefresh everyMs={5000} />
@@ -57,7 +56,7 @@ async function Live() {
                 <th className="p-3">Usuario</th>
                 <th>Estado</th>
                 <th>Idioma</th>
-                <th>Tiempo</th>
+                <th>Inicio</th>
                 <th>Reserva</th>
                 <th />
               </tr>
@@ -73,7 +72,7 @@ async function Live() {
                     </td>
                     <td>{s.status}</td>
                     <td>{s.language}</td>
-                    <td className="tabular-nums">{Math.round((now - start.getTime()) / 1000)} s</td>
+                    <td className="tabular-nums">desde {start.toLocaleTimeString("es")}</td>
                     <td className="tabular-nums">{s.reservedSeconds} s</td>
                     <td className="p-2 text-right">
                       {["READY", "LIVE", "ENDING"].includes(s.status) && (

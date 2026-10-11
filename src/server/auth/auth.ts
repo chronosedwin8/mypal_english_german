@@ -84,7 +84,8 @@ export const auth = betterAuth({
   },
 
   rateLimit: {
-    enabled: true,
+    // Activo en produccion (en local todas las pruebas vienen de la misma IP).
+    enabled: process.env.NODE_ENV === "production" || process.env.FORCE_RATE_LIMIT === "true",
     storage: "database",
     window: 60,
     max: 60,

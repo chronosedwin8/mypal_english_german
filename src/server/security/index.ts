@@ -42,9 +42,16 @@ export function pepperedHash(value: string): string {
   return createHmac("sha256", pepper).update(value).digest("base64url");
 }
 
+function isLoopback(ip: string) {
+  return ip === "::1" || ip.startsWith("127.") || ip.startsWith("::ffff:127.");
+}
+
 export function ipPrefixHash(headers: Headers): string | null {
   const ip = clientIp(headers);
-  return ip ? pepperedHash(`ip:${ipPrefix(ip)}`) : null;
+  if (!ip) return null;
+  // En desarrollo todas las peticiones vienen de localhost: no limitar por red.
+  if (isLoopback(ip) && process.env.NODE_ENV !== "production") return null;
+  return pepperedHash(`ip:${ipPrefix(ip)}`);
 }
 
 /** Cookie anonima del test de nivel (se liga a la cuenta al registrarse). */

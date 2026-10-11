@@ -29,16 +29,15 @@ export function ItemView({
   onAnswer: (itemId: string, index: number, latencyMs: number) => void;
 }) {
   const { item } = state;
-  const shownAt = useRef(Date.now());
+  const shownAt = useRef(0);
   const [plays, setPlays] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [chosen, setChosen] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // El padre monta una vista nueva por pregunta (key = item.id): no hay que reiniciar estado.
   useEffect(() => {
     shownAt.current = Date.now();
-    setPlays(0);
-    setChosen(null);
     return () => {
       audioRef.current?.pause();
       if (typeof window !== "undefined") window.speechSynthesis?.cancel();

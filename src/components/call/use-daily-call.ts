@@ -12,7 +12,9 @@ import type { CallControls, CallOptions, CallState, Caption } from "./types";
 export function useDailyCall(opts: CallOptions): CallState & CallControls {
   const callRef = useRef<DailyCall | null>(null);
   const optsRef = useRef(opts);
-  optsRef.current = opts;
+  useEffect(() => {
+    optsRef.current = opts;
+  });
   const captionId = useRef(0);
   const [state, setState] = useState<CallState>({
     status: "idle",

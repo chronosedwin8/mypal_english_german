@@ -29,7 +29,9 @@ const SCRIPT: { role: Caption["role"]; text: string; tool?: { name: string; argu
 
 export function useMockCall(opts: CallOptions): CallState & CallControls {
   const optsRef = useRef(opts);
-  optsRef.current = opts;
+  useEffect(() => {
+    optsRef.current = opts;
+  });
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const idRef = useRef(0);

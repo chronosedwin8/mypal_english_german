@@ -142,7 +142,9 @@ export function TutorRoom({
   const daily = useDailyCall(callOpts);
   const mock = useMockCall(callOpts);
   const call = session?.driver === "http" ? daily : mock;
-  leaveRef.current = call.leave;
+  useEffect(() => {
+    leaveRef.current = call.leave;
+  });
 
   // ---------- vista previa de camara ----------
   useEffect(() => {
@@ -170,13 +172,21 @@ export function TutorRoom({
 
   useEffect(() => {
     if (!resumeSessionId) return;
-    loadSession(resumeSessionId)
+    let cancelled = false;
+    fetch(`/api/sessions/${resumeSessionId}`, { cache: "no-store" })
+      .then((r) => (r.ok ? (r.json() as Promise<SessionView>) : Promise.reject(new Error("no encontrada"))))
       .then((v) => {
+        if (cancelled) return;
+        offset.current = new Date(v.serverNow).getTime() - Date.now();
+        setSession(v);
         if (v.status === "READY" || v.status === "LIVE") setPhase("call");
         else router.replace(`/app/clase/${v.id}/resumen`);
       })
       .catch(() => undefined);
-  }, [resumeSessionId, loadSession, router]);
+    return () => {
+      cancelled = true;
+    };
+  }, [resumeSessionId, router]);
 
   // ---------- empezar ----------
   const start = useCallback(
