@@ -594,6 +594,10 @@ model DiagnosticAttempt {
   thetaSe       Float                @default(1.0)
   resultLevel   Cefr?
   skillScores   Json?
+  /// ITEMS -> SPEAKING -> DONE
+  phase         String               @default("ITEMS")
+  /// pregunta servida y aun sin responder (evita responder preguntas arbitrarias)
+  currentItemId String?
   speakingScore Float?
   speakingCount Int                  @default(0)
   ipPrefixHash  String?

@@ -9,7 +9,9 @@ import { captcha } from "better-auth/plugins";
 
 import { canonicalEmail } from "@/lib/email-canonical";
 import { db } from "@/server/db";
+import { linkAnonymousAttempts } from "@/server/diagnostic/service";
 import { resetPasswordEmail, sendEmail, verificationEmail } from "@/server/email";
+import { ANON_COOKIE, readCookie } from "@/server/security";
 
 const appUrl = process.env.BETTER_AUTH_URL ?? process.env.APP_URL ?? "http://localhost:3000";
 
@@ -66,6 +68,16 @@ export const auth = betterAuth({
             create: { userId: user.id },
             update: {},
           });
+        },
+      },
+    },
+    session: {
+      create: {
+        after: async (session, ctx) => {
+          // Los tests de nivel hechos sin cuenta pasan a la cuenta al ingresar.
+          const headers = ctx?.headers ?? ctx?.request?.headers;
+          const anonId = headers ? readCookie(headers, ANON_COOKIE) : null;
+          if (anonId) await linkAnonymousAttempts(session.userId, anonId).catch(() => 0);
         },
       },
     },
