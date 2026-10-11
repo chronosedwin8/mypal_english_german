@@ -1,0 +1,737 @@
+// MyPAL — modelo de datos
+//
+// Reglas de dinero (minutos):
+//  - Todo se mide en SEGUNDOS enteros y centavos de USD enteros. Sin floats en el ledger.
+//  - LedgerEntry es de solo-insercion. Los saldos viven en MinuteWallet / MinuteBucket y
+//    la base de datos los protege con CHECKs (ver migracion "money_guards").
+//  - Orden de candados: MinuteWallet(user) -> TutorSession -> MinuteBucket (por id) -> ConcurrencySlot.
+
+generator client {
+  provider        = "prisma-client"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["partialIndexes"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// Enums
+// ============================================================================
+
+/// Variante que se aprende (cada una tiene su propio tutor en Tavus).
+enum TargetLang {
+  EN_US
+  EN_GB
+  DE
+}
+
+/// Idioma base para contenido compartido (EN_US y EN_GB comparten banco de preguntas).
+enum BaseLang {
+  EN
+  DE
+}
+
+enum Cefr {
+  A1
+  A2
+  B1
+  B2
+  C1
+  C2
+}
+
+enum BucketSource {
+  TRIAL
+  PLAN_CYCLE
+  ADMIN_GRANT
+  TOPUP
+}
+
+enum LedgerType {
+  GRANT
+  HOLD
+  CAPTURE
+  RELEASE
+  EXPIRE
+  CLAWBACK
+  ADJUST
+}
+
+enum SessionStatus {
+  RESERVED
+  CREATING
+  READY
+  LIVE
+  ENDING
+  ENDED
+  SETTLED
+  FAILED
+}
+
+enum EndReason {
+  USER_END
+  TAB_CLOSE
+  CLIENT_LEFT
+  TAVUS_SHUTDOWN
+  DEADLINE
+  NO_SHOW
+  HEARTBEAT_LOST
+  ADMIN
+  CREATE_FAILED
+  ORPHAN
+}
+
+enum SlotState {
+  FREE
+  OFFERED
+  BUSY
+  DISABLED
+}
+
+enum QueueStatus {
+  WAITING
+  OFFERED
+  CLAIMED
+  EXPIRED
+  CANCELLED
+  ABANDONED
+}
+
+enum SubStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum PaymentKind {
+  SUBSCRIPTION
+  TOPUP
+}
+
+enum PaymentStatus {
+  SUCCEEDED
+  REFUNDED
+  FAILED
+}
+
+enum Skill {
+  GRAMMAR
+  VOCAB
+  READING
+  LISTENING
+}
+
+enum AttemptStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+// ============================================================================
+// Autenticacion (tablas de Better Auth)
+// ============================================================================
+
+model User {
+  id             String    @id
+  name           String
+  email          String    @unique
+  emailVerified  Boolean   @default(false)
+  image          String?
+  /// STUDENT | ADMIN (string para que Better Auth lo escriba sin enums)
+  role           String    @default("STUDENT")
+  /// minusculas y, en gmail, sin puntos ni +etiqueta: evita pruebas gratis repetidas
+  emailCanonical String?   @unique
+  bannedAt       DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sessions           Session[]
+  accounts           Account[]
+  profiles           LanguageProfile[]
+  wallet             MinuteWallet?
+  buckets            MinuteBucket[]
+  subscriptions      Subscription[]
+  payments           Payment[]
+  tutorSessions      TutorSession[]
+  queueEntries       SessionQueueEntry[]
+  vocabulary         VocabularyItem[]
+  diagnosticAttempts DiagnosticAttempt[]
+  trialClaim         TrialClaim?
+  lessonProgress     LessonProgress[]
+  corrections        SessionCorrection[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+model RateLimit {
+  id          String @id
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+
+  @@map("rate_limit")
+}
+
+// ============================================================================
+// Perfil de aprendizaje
+// ============================================================================
+
+model LanguageProfile {
+  id             String     @id @default(uuid(7))
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language       TargetLang
+  level          Cefr?
+  /// DIAGNOSTIC | SELF | TUTOR | ADMIN
+  levelSource    String?
+  theta          Float?
+  skillScores    Json?
+  /// Valor de participant_tags en Tavus (memoria del tutor entre clases)
+  memoryTag      String     @unique
+  xp             Int        @default(0)
+  streakDays     Int        @default(0)
+  lastPracticeAt DateTime?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  @@unique([userId, language])
+}
+
+// ============================================================================
+// Comercio
+// ============================================================================
+
+model Plan {
+  /// codigo estable: basico | fluido | inmersion
+  id                   String         @id
+  nameEs               String
+  priceUsdCents        Int
+  monthlySeconds       Int
+  perSessionCapSeconds Int
+  isActive             Boolean        @default(true)
+  highlight            Boolean        @default(false)
+  sortOrder            Int
+  features             Json
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  subscriptions        Subscription[]
+}
+
+model TopupPack {
+  /// codigo estable: recarga-15 | recarga-30
+  id            String   @id
+  nameEs        String
+  priceUsdCents Int
+  seconds       Int
+  validityDays  Int      @default(90)
+  isActive      Boolean  @default(true)
+  sortOrder     Int
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Subscription {
+  id                 String    @id @default(uuid(7))
+  userId             String
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId             String
+  plan               Plan      @relation(fields: [planId], references: [id])
+  /// fake | stripe | mercadopago | wompi
+  provider           String
+  externalId         String
+  status             SubStatus
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean   @default(false)
+  canceledAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@unique([provider, externalId])
+  @@unique([userId], map: "one_live_subscription", where: raw("status = ANY (ARRAY['ACTIVE'::\"SubStatus\", 'PAST_DUE'::\"SubStatus\"])"))
+  @@index([userId, status])
+}
+
+model Payment {
+  id               String        @id @default(uuid(7))
+  userId           String
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider         String
+  externalId       String
+  kind             PaymentKind
+  status           PaymentStatus
+  subscriptionId   String?
+  planId           String?
+  topupPackId      String?
+  amountUsdCents   Int
+  feeUsdCents      Int           @default(0)
+  netUsdCents      Int
+  refundedUsdCents Int           @default(0)
+  secondsGranted   Int           @default(0)
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  createdAt        DateTime      @default(now())
+
+  @@unique([provider, externalId])
+  @@index([createdAt])
+  @@index([userId, createdAt])
+}
+
+model ProcessedWebhookEvent {
+  provider   String
+  eventId    String
+  type       String
+  receivedAt DateTime @default(now())
+
+  @@id([provider, eventId])
+}
+
+// ============================================================================
+// Minutos (ledger)
+// ============================================================================
+
+/// Una fila por usuario. Es el candado (FOR UPDATE) de toda operacion de minutos.
+model MinuteWallet {
+  userId           String   @id
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  availableSeconds Int      @default(0)
+  heldSeconds      Int      @default(0)
+  updatedAt        DateTime @updatedAt
+}
+
+model MinuteBucket {
+  id              String        @id @default(uuid(7))
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source          BucketSource
+  /// PLAN_CYCLE=10, ADMIN_GRANT=15, TOPUP=20 (TRIAL aislado)
+  priority        Int
+  grantedSeconds  Int
+  heldSeconds     Int           @default(0)
+  consumedSeconds Int           @default(0)
+  expiredSeconds  Int           @default(0)
+  validFrom       DateTime      @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  /// "plan:<pagoId>" | "topup:<pagoId>" | "trial:<userId>" | "admin:<auditId>"
+  grantKey        String        @unique
+  paymentId       String?       @unique
+  subscriptionId  String?
+  createdAt       DateTime      @default(now())
+  holds           SessionHold[]
+
+  @@unique([userId], map: "one_trial_bucket_per_user", where: raw("source = 'TRIAL'"))
+  @@index([userId, expiresAt])
+}
+
+/// Solo insercion. Nunca UPDATE/DELETE.
+model LedgerEntry {
+  id             BigInt     @id @default(autoincrement())
+  userId         String
+  bucketId       String
+  sessionId      String?
+  type           LedgerType
+  /// magnitud > 0
+  seconds        Int
+  deltaAvailable Int
+  deltaHeld      Int
+  idempotencyKey String     @unique
+  reason         String?
+  actorUserId    String?
+  createdAt      DateTime   @default(now())
+
+  @@index([userId, createdAt])
+  @@index([sessionId])
+}
+
+/// Que cubo financia cada clase y cuanto se cobro/libero de el.
+model SessionHold {
+  sessionId       String
+  session         TutorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  bucketId        String
+  bucket          MinuteBucket @relation(fields: [bucketId], references: [id])
+  allocOrder      Int
+  heldSeconds     Int
+  capturedSeconds Int          @default(0)
+  releasedSeconds Int          @default(0)
+
+  @@id([sessionId, bucketId])
+}
+
+// ============================================================================
+// Clases con el tutor
+// ============================================================================
+
+model TutorSession {
+  id                  String              @id @default(uuid(7))
+  userId              String
+  user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language            TargetLang
+  lessonId            String?
+  isTrial             Boolean             @default(false)
+  testMode            Boolean             @default(false)
+  status              SessionStatus       @default(RESERVED)
+  /// Idempotency-Key del cliente (evita doble clic)
+  clientRequestId     String
+  queueEntryId        String?             @unique
+  slotId              Int?
+  palId               String
+  /// "mypal:<id>" para encontrar conversaciones huerfanas
+  conversationName    String              @unique
+  tavusConversationId String?             @unique
+  conversationUrl     String?
+  meetingToken        String?
+  reservedSeconds     Int
+  maxCallDurationSec  Int
+  createRequestedAt   DateTime?
+  tavusCreatedAt      DateTime?
+  hardDeadlineAt      DateTime?
+  joinedAt            DateTime?
+  lastHeartbeatAt     DateTime?
+  cancelRequested     Boolean             @default(false)
+  endRequestedAt      DateTime?
+  endReason           EndReason?
+  tavusEndedAt        DateTime?
+  endObservedAt       DateTime?
+  shutdownReason      String?
+  /// Equivalente Tavus (redondeo a 6 s, minimo 30 s)
+  billedSeconds       Int?
+  /// Descontado al usuario (0 si se perdona)
+  chargedSeconds      Int?
+  uncollectedSeconds  Int                 @default(0)
+  /// Costo por minuto en micro-USD al iniciar (snapshot)
+  costPerMinMicroUsd  Int
+  costMicroUsd        BigInt?
+  failureCode         String?
+  settledAt           DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  holds               SessionHold[]
+  transcript          Transcript?
+  corrections         SessionCorrection[]
+
+  @@unique([userId, clientRequestId])
+  @@unique([userId], map: "one_open_session_per_user", where: raw("status = ANY (ARRAY['RESERVED'::\"SessionStatus\", 'CREATING'::\"SessionStatus\", 'READY'::\"SessionStatus\", 'LIVE'::\"SessionStatus\", 'ENDING'::\"SessionStatus\"])"))
+  @@unique([userId], map: "one_trial_session_per_user", where: raw("\"isTrial\" AND status <> 'FAILED'"))
+  @@index([status, hardDeadlineAt])
+  @@index([userId, createdAt(sort: Desc)])
+}
+
+/// N filas = limite de concurrencia del plan Tavus.
+model ConcurrencySlot {
+  id           Int       @id
+  state        SlotState @default(FREE)
+  sessionId    String?   @unique
+  queueEntryId String?   @unique
+  offeredUntil DateTime?
+  changedAt    DateTime  @updatedAt
+}
+
+model SessionQueueEntry {
+  id         String      @id @default(uuid(7))
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language   TargetLang
+  lessonId   String?
+  status     QueueStatus @default(WAITING)
+  lastSeenAt DateTime    @default(now())
+  offeredAt  DateTime?
+  createdAt  DateTime    @default(now())
+
+  @@unique([userId], map: "one_active_queue_entry", where: raw("status = ANY (ARRAY['WAITING'::\"QueueStatus\", 'OFFERED'::\"QueueStatus\"])"))
+  @@index([status, createdAt])
+}
+
+model TavusEvent {
+  id             BigInt    @id @default(autoincrement())
+  sessionId      String?
+  conversationId String
+  eventType      String
+  eventTs        DateTime?
+  payload        Json
+  /// WEBHOOK | POLL | CLIENT
+  source         String
+  dedupeKey      String    @unique
+  receivedAt     DateTime  @default(now())
+
+  @@index([sessionId])
+}
+
+model Transcript {
+  sessionId          String       @id
+  session            TutorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  turns              Json
+  perceptionAnalysis String?
+  summaryEs          String?
+  fetchedVia         String
+  createdAt          DateTime     @default(now())
+}
+
+model SessionCorrection {
+  id          String       @id @default(uuid(7))
+  sessionId   String
+  session     TutorSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  original    String
+  corrected   String
+  explanation String?
+  createdAt   DateTime     @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ============================================================================
+// Aprendizaje
+// ============================================================================
+
+model VocabularyItem {
+  id             String     @id @default(uuid(7))
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  language       TargetLang
+  term           String
+  termNormalized String
+  translationEs  String?
+  example        String?
+  /// TOOL_CALL | LESSON | MANUAL
+  source         String
+  sessionId      String?
+  ease           Float      @default(2.5)
+  intervalDays   Int        @default(0)
+  reps           Int        @default(0)
+  lapses         Int        @default(0)
+  dueAt          DateTime   @default(now())
+  createdAt      DateTime   @default(now())
+
+  @@unique([userId, language, termNormalized])
+  @@index([userId, language, dueAt])
+}
+
+model DiagnosticItem {
+  /// codigo estable, p. ej. "en-b1-grammar-03"
+  id             String               @id
+  lang           BaseLang
+  skill          Skill
+  level          Cefr
+  /// dificultad IRT (logits)
+  difficulty     Float
+  stem           String
+  passage        String?
+  /// texto que se convierte en audio (items de escucha)
+  audioText      String?
+  options        Json
+  /// nunca se envia al navegador
+  correctIndex   Int
+  explanationEs  String?
+  isActive       Boolean              @default(true)
+  timesServed    Int                  @default(0)
+  timesCorrect   Int                  @default(0)
+  responses      DiagnosticResponse[]
+
+  @@index([lang, isActive, difficulty])
+}
+
+model DiagnosticAttempt {
+  id            String               @id @default(uuid(7))
+  userId        String?
+  user          User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  /// cookie anonima: el test se hace sin registro y se liga al crear la cuenta
+  anonId        String?
+  language      TargetLang
+  status        AttemptStatus        @default(IN_PROGRESS)
+  theta         Float                @default(-1.0)
+  thetaSe       Float                @default(1.0)
+  resultLevel   Cefr?
+  skillScores   Json?
+  speakingScore Float?
+  speakingCount Int                  @default(0)
+  ipPrefixHash  String?
+  startedAt     DateTime             @default(now())
+  completedAt   DateTime?
+  responses     DiagnosticResponse[]
+  speaking      SpeakingSample[]
+
+  @@index([userId])
+  @@index([anonId])
+  @@index([ipPrefixHash, startedAt])
+}
+
+model DiagnosticResponse {
+  attemptId   String
+  attempt     DiagnosticAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  itemId      String
+  item        DiagnosticItem    @relation(fields: [itemId], references: [id])
+  seq         Int
+  chosenIndex Int
+  isCorrect   Boolean
+  thetaAfter  Float
+  seAfter     Float
+  latencyMs   Int?
+  answeredAt  DateTime          @default(now())
+
+  @@id([attemptId, itemId])
+  @@unique([attemptId, seq])
+}
+
+model SpeakingSample {
+  id             String            @id @default(uuid(7))
+  attemptId      String
+  attempt        DiagnosticAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  taskId         String
+  transcript     String
+  /// 0..1 precision frente a la frase de referencia (lectura en voz alta)
+  accuracy       Float?
+  wordsPerMinute Float?
+  uniqueWords    Int?
+  durationMs     Int
+  /// 0..1
+  score          Float
+  createdAt      DateTime          @default(now())
+
+  @@unique([attemptId, taskId])
+}
+
+model Module {
+  id            String   @id
+  lang          BaseLang
+  level         Cefr
+  slug          String
+  titleEs       String
+  descriptionEs String
+  emoji         String?
+  sortOrder     Int
+  isPublished   Boolean  @default(true)
+  lessons       Lesson[]
+
+  @@unique([lang, slug])
+}
+
+model Lesson {
+  id               String           @id
+  moduleId         String
+  module           Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  slug             String
+  titleEs          String
+  objectives       String[]
+  targetVocab      String[]
+  /// instrucciones (en ingles) que recibe el tutor en conversational_context
+  tutorBrief       String
+  usesVision       Boolean          @default(false)
+  suggestedMinutes Int
+  sortOrder        Int
+  progress         LessonProgress[]
+
+  @@unique([moduleId, slug])
+}
+
+model LessonProgress {
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId      String
+  lesson        Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  sessionsCount Int       @default(0)
+  lastSessionAt DateTime?
+  completedAt   DateTime?
+
+  @@id([userId, lessonId])
+}
+
+// ============================================================================
+// Antiabuso, Tavus, configuracion
+// ============================================================================
+
+model TrialClaim {
+  id             String   @id @default(uuid(7))
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailCanonical String   @unique
+  deviceIdHash   String   @unique
+  /// /24 IPv4 o /64 IPv6, con pepper
+  ipPrefixHash   String
+  sessionId      String?  @unique
+  createdAt      DateTime @default(now())
+
+  @@index([ipPrefixHash, createdAt])
+}
+
+model TavusPal {
+  variant        TargetLang @id
+  palId          String     @unique
+  faceId         String
+  basePalId      String
+  palName        String
+  specHash       String
+  lastSyncedAt   DateTime
+  lastVerifiedAt DateTime?
+}
+
+model AppConfig {
+  key       String   @id
+  value     Json
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+model AuditLog {
+  id          BigInt   @id @default(autoincrement())
+  actorUserId String?
+  action      String
+  entity      String
+  entityId    String?
+  before      Json?
+  after       Json?
+  createdAt   DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
