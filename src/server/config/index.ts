@@ -95,6 +95,11 @@ export const CONFIG_SCHEMA = {
     .default({ tdn5: 16, tdn4: 12, tdn3: 8 }),
   /** Segundos para leer las preguntas antes de cada tramo de audio de Listening. */
   "exam.listening.readSeconds": z.number().int().min(0).max(120).default(30),
+  /** Speaking: preguntas de la Parte 1 y de la Parte 3, y segundos maximos por respuesta. */
+  "exam.speaking.part1Questions": z.number().int().min(3).max(14).default(9),
+  "exam.speaking.part3Questions": z.number().int().min(2).max(10).default(6),
+  "exam.speaking.answerSeconds": z.number().int().min(15).max(180).default(60),
+  "exam.speaking.longTurnSeconds": z.number().int().min(60).max(180).default(120),
   /** Validez de las URLs prefirmadas de audio (segundos). */
   "exam.audioUrlSeconds": z.number().int().min(30).max(3600).default(300),
 

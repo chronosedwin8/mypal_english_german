@@ -7,6 +7,7 @@ import { z } from "zod";
 import { EXAM_CODES } from "@/content/exams";
 import { db } from "@/server/db";
 import { attachAudio, produceBlock } from "@/server/exams/bank/pipeline";
+import { gradeSpeaking } from "@/server/exams/speaking";
 import { gradeWriting } from "@/server/exams/writing";
 
 import { claimJobs, completeJob, failJob, type JobType } from "./queue";
@@ -39,6 +40,10 @@ const HANDLERS: Partial<Record<JobType, Handler>> = {
     // Falla temporal (red, cuota): se lanza para que la cola reintente.
     if (r.status === "FAILED") throw new Error(r.issues.join("; "));
     return { status: r.status, issues: r.issues, costMicroUsd: String(r.costMicroUsd) };
+  },
+  "speaking.grade": async (payload, job) => {
+    const { submissionId } = z.object({ submissionId: z.string() }).parse(payload);
+    return gradeSpeaking(submissionId, { finalAttempt: job.attempts >= MAX_ATTEMPTS });
   },
   "writing.grade": async (payload, job) => {
     const { submissionId } = z.object({ submissionId: z.string() }).parse(payload);

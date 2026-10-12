@@ -7,6 +7,7 @@ import { EXAM_CODES } from "@/content/exams";
 import { requireUser } from "@/server/auth/dal";
 import { QuotaError } from "@/server/exams/entitlements";
 import { PracticeError, audioUrl, recordTabSwitch, saveAnswer, startPractice, submitPractice } from "@/server/exams/practice";
+import { SpeakingError, startSpeaking, type SpeakingPart } from "@/server/exams/speaking";
 import { WritingError, saveWritingDraft, startWriting, submitWriting } from "@/server/exams/writing";
 
 const StartSchema = z.object({
@@ -104,4 +105,23 @@ export async function submitWritingAction(attemptId: string, text: string): Prom
     return failure(err);
   }
   redirect(`/app/examenes/writing/${attemptId}`);
+}
+
+/* ───────────── Speaking ───────────── */
+
+export async function startSpeakingAction(formData: FormData) {
+  const user = await requireUser("/app/examenes");
+  const input = z
+    .object({ exam: z.enum(EXAM_CODES as [string, ...string[]]), parts: z.enum(["all", "1", "2", "3"]) })
+    .parse(Object.fromEntries(formData));
+  const parts: SpeakingPart[] = input.parts === "all" ? [1, 2, 3] : [Number(input.parts) as SpeakingPart];
+  let attemptId: string;
+  try {
+    ({ attemptId } = await startSpeaking(user, { exam: input.exam as never, parts }));
+  } catch (err) {
+    if (err instanceof SpeakingError) redirect(`/app/examenes?examen=${input.exam}&aviso=${encodeURIComponent(err.message)}`);
+    if (err instanceof QuotaError) redirect(`/app/examenes?examen=${input.exam}&aviso=${encodeURIComponent("No te quedan partes de Speaking en tu plan.")}`);
+    throw err;
+  }
+  redirect(`/app/examenes/speaking/${attemptId}`);
 }

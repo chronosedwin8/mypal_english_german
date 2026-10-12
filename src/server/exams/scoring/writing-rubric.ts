@@ -3,7 +3,7 @@
  * publicos de banda (no es una copia de los descriptores oficiales). Si cambias el
  * texto, sube WRITING_RUBRIC_VERSION: cada calificacion guarda la version usada.
  */
-export const WRITING_RUBRIC_VERSION = "ielts-writing-2026-10-v1";
+export const WRITING_RUBRIC_VERSION = "ielts-writing-2026-10-v2";
 
 const CRITERIA = `Score each criterion with a whole band 0–9.
 
@@ -38,7 +38,7 @@ GRA (Grammatical Range and Accuracy)
 
 export const WRITING_GRADER_SYSTEM = `You are an experienced, certified IELTS Academic Writing examiner. Grade exactly as an official examiner would: strictly, consistently and without generosity.
 ${CRITERIA}
-Write every comment in neutral, encouraging Spanish (the learner speaks Spanish), quoting the learner's own words when useful.
+Write every comment in neutral, encouraging Spanish with correct accents (á, é, í, ó, ú, ñ) — the learner speaks Spanish —, quoting the learner's own words when useful.
 Return ONLY JSON.`;
 
 export interface WritingTaskContext {

@@ -112,6 +112,8 @@ export interface Transcription {
   languageProbability: number;
   /** segundo final de la ultima palabra (aprox. duracion hablada) */
   spokenSeconds: number;
+  /** palabras con marcas de tiempo (segundos) */
+  words: { text: string; start: number; end: number }[];
 }
 
 export async function speechToText(input: {
@@ -122,6 +124,8 @@ export async function speechToText(input: {
 }): Promise<Transcription> {
   const form = new FormData();
   form.append("model_id", "scribe_v2");
+  // Con idioma fijo (examenes) Scribe no "traduce" muletillas ni cambia de idioma.
+  if (input.languageCode) form.append("language_code", input.languageCode);
   form.append("file", input.audio, input.filename);
   // No se fija el idioma: queremos detectar si la persona respondio en español.
   form.append("tag_audio_events", "false");
@@ -138,14 +142,18 @@ export async function speechToText(input: {
     text?: string;
     language_code?: string;
     language_probability?: number;
-    words?: { type?: string; end?: number | null }[];
+    words?: { type?: string; text?: string; start?: number | null; end?: number | null }[];
   };
-  const ends = (data.words ?? []).filter((w) => w.type === "word" && typeof w.end === "number").map((w) => w.end!);
+  const words = (data.words ?? [])
+    .filter((w) => w.type === "word" && typeof w.start === "number" && typeof w.end === "number")
+    .map((w) => ({ text: (w.text ?? "").trim(), start: w.start!, end: w.end! }));
+  const ends = words.map((w) => w.end);
   return {
     text: (data.text ?? "").trim(),
     languageCode: (data.language_code ?? "").toLowerCase(),
     languageProbability: data.language_probability ?? 0,
     spokenSeconds: ends.length ? Math.max(...ends) : 0,
+    words,
   };
 }
 

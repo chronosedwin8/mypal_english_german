@@ -4,13 +4,14 @@
  *  - STORAGE_DRIVER=memory: en memoria (tests).
  * Bucket, region y prefijo vienen de .env.
  */
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export interface Storage {
   readonly driver: "s3" | "memory";
   put(key: string, body: Buffer | Uint8Array | string, contentType: string): Promise<void>;
   get(key: string): Promise<Buffer | null>;
+  exists(key: string): Promise<boolean>;
   remove(key: string): Promise<void>;
   /** URL temporal de lectura. */
   signedUrl(key: string, seconds: number): Promise<string>;
@@ -50,6 +51,14 @@ class S3Storage implements Storage {
       return null;
     }
   }
+  async exists(key: string) {
+    try {
+      await this.client.send(new HeadObjectCommand({ Bucket: this.bucket, Key: key }));
+      return true;
+    } catch {
+      return false;
+    }
+  }
   async remove(key: string) {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
   }
@@ -67,6 +76,9 @@ class MemoryStorage implements Storage {
   async get(key: string) {
     return this.files.get(key)?.body ?? null;
   }
+  async exists(key: string) {
+    return this.files.has(key);
+  }
   async remove(key: string) {
     this.files.delete(key);
   }
@@ -75,10 +87,13 @@ class MemoryStorage implements Storage {
   }
 }
 
-const g = globalThis as unknown as { __storage?: Storage };
+const g = globalThis as unknown as { __storage?: Storage; __storageVersion?: number };
+/** Sube este numero si cambia la interfaz: en desarrollo se descarta la instancia vieja. */
+const STORAGE_VERSION = 2;
 
 export function storage(): Storage {
-  if (g.__storage) return g.__storage;
+  if (g.__storage && g.__storageVersion === STORAGE_VERSION) return g.__storage;
+  g.__storageVersion = STORAGE_VERSION;
   const driver = process.env.STORAGE_DRIVER ?? (process.env.S3_BUCKET ? "s3" : "memory");
   if (driver === "s3") {
     const bucket = process.env.S3_BUCKET?.trim();

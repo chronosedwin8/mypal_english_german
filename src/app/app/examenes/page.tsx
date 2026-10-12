@@ -17,7 +17,7 @@ import { quotaSummary } from "@/server/exams/entitlements";
 import { BANK_EXAMS } from "@/server/exams/bank/targets";
 import { practiceOverview, type PracticeConfig, type PracticeScores } from "@/server/exams/practice";
 
-import { startPracticeAction, startWritingAction } from "./actions";
+import { startPracticeAction, startSpeakingAction, startWritingAction } from "./actions";
 
 export const metadata = { title: "Exámenes" };
 
@@ -96,6 +96,67 @@ async function PracticeAccess({ user }: { user: { id: string; role: "STUDENT" | 
       <Link href="/app/planes" className={cn(buttonVariants(), "rounded-full")}>
         Ver planes
       </Link>
+    </div>
+  );
+}
+
+async function SpeakingCard({ user, exam }: { user: { id: string; role: "STUDENT" | "ADMIN" }; exam: ExamCode }) {
+  const [access, quota, recent] = await Promise.all([
+    can(user, "exam.speaking"),
+    quotaSummary(user.id),
+    db.examAttempt.findMany({
+      where: { userId: user.id, exam, mode: "SPEAKING", status: { not: "VOIDED" } },
+      orderBy: { startedAt: "desc" },
+      take: 3,
+      select: { id: true, status: true, overall: true, config: true },
+    }),
+  ]);
+  return (
+    <div className="flex gap-4 rounded-3xl border bg-card p-5">
+      <MicIcon className="mt-1 size-5 shrink-0 text-primary" />
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">Speaking con examinador por voz</p>
+        <p className="mt-1 text-sm text-muted-foreground">Las tres partes del examen, con tarjeta, tiempo real y nota por criterio.</p>
+        {access.allowed ? (
+          <form action={startSpeakingAction} className="mt-4 space-y-3">
+            <input type="hidden" name="exam" value={exam} />
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" name="parts" value="all" size="sm">
+                Examen completo
+              </Button>
+              {[1, 2, 3].map((p) => (
+                <Button key={p} type="submit" name="parts" value={String(p)} size="sm" variant="outline">
+                  Part {p}
+                </Button>
+              ))}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {access.unlimited ? "Administrador: sin límite." : `Te quedan ${quota.SPEAKING.available} partes este periodo. El examen completo usa 3.`}
+            </p>
+          </form>
+        ) : (
+          <div className="mt-4 space-y-2">
+            <p className="text-sm">{access.reason}</p>
+            <Link href="/app/planes" className={cn(buttonVariants({ size: "sm" }), "rounded-full")}>
+              Ver el Pase de examen
+            </Link>
+          </div>
+        )}
+        {recent.length > 0 && (
+          <ul className="mt-4 space-y-1 border-t pt-3 text-sm">
+            {recent.map((a) => (
+              <li key={a.id}>
+                <Link href={`/app/examenes/speaking/${a.id}`} className="flex justify-between hover:underline">
+                  <span>{((a.config as { parts?: number[] }).parts ?? []).length === 3 ? "Examen completo" : `Part ${((a.config as { parts?: number[] }).parts ?? [])[0]}`}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {a.status === "COMPLETED" && a.overall !== null ? `banda ${a.overall.toFixed(1)}` : a.status === "IN_PROGRESS" ? "continuar" : "calificando…"}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
@@ -305,15 +366,7 @@ async function IeltsPractice({ user, exam }: { user: { id: string; role: "STUDEN
 
       <section className="grid gap-4 sm:grid-cols-2">
         <WritingCard user={user} exam={exam} />
-        <div className="flex gap-4 rounded-3xl border border-dashed p-5">
-          <MicIcon className="mt-1 size-5 shrink-0 text-muted-foreground" />
-          <div>
-            <p className="font-semibold">
-              Speaking con examinador por voz <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs font-normal">pronto</span>
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">Las tres partes del examen, con tarjeta y tiempo real.</p>
-          </div>
-        </div>
+        <SpeakingCard user={user} exam={exam} />
       </section>
 
       {recent.length > 0 && (
