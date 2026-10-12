@@ -13,6 +13,7 @@
  */
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
+import { EXAMINER_MODULE_PREFIX } from "@/content/modules";
 import type { Audience, Cefr, EndReason, SessionStatus, TargetLang } from "@/generated/prisma/client";
 import { planById } from "@/lib/pricing/catalog";
 import { can } from "@/server/access";
@@ -89,7 +90,9 @@ export async function startSession(input: StartInput): Promise<StartResult> {
   const profile = await db.languageProfile.findUnique({
     where: { userId_language: { userId: input.user.id, language: input.language } },
   });
-  const lesson = input.lessonId ? await db.lesson.findUnique({ where: { id: input.lessonId }, select: { id: true } }) : null;
+  const found = input.lessonId ? await db.lesson.findUnique({ where: { id: input.lessonId }, select: { id: true, module: { select: { slug: true } } } }) : null;
+  // Las lecciones de examinador solo valen con el interruptor encendido.
+  const lesson = found && (!found.module.slug.startsWith(EXAMINER_MODULE_PREFIX) || (await getConfig())["exam.avatarExaminer"]) ? found : null;
   const now = new Date();
   const sessionId = randomUUID();
   const testMode = false;

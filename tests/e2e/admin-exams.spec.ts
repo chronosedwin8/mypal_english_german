@@ -35,7 +35,8 @@ test("banco de examenes: inventario, bloques y detalle", async ({ page }) => {
   // Writing Task 1 con su grafico dibujado.
   await page.goto("/admin/examenes?estado=ALL");
   await expect(page.getByRole("heading", { name: "Banco de exámenes" })).toBeVisible({ timeout: 60_000 });
-  const writing = page.locator("tr", { hasText: "Writing 1" }).getByRole("link").first();
+  // Solo IELTS Task 1 trae grafico (Schreiben Teil 1 del aleman es un correo).
+  const writing = page.locator("tr", { hasText: "GRAPH_REPORT" }).getByRole("link").first();
   if (await writing.count()) {
     await writing.click();
     await expect(page.locator("svg[role=img]").first()).toBeVisible({ timeout: 60_000 });

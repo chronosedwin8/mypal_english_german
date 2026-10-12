@@ -88,9 +88,20 @@ export const CONFIG_SCHEMA = {
   "exam.freePractices": z.number().int().min(0).max(50).default(1),
   /** Generacion al momento en practica dirigida (por usuario y dia). */
   "exam.adhoc.dailyPerUser": z.number().int().min(0).max(50).default(3),
+  /** Calibracion con uso real: respuestas minimas por pregunta y umbrales de pregunta defectuosa. */
+  "exam.calibration.minResponses": z.number().int().min(5).max(1000).default(30),
+  "exam.calibration.minDiscrimination": z.number().min(-1).max(1).default(0.1),
+  "exam.calibration.minPCorrect": z.number().min(0).max(0.5).default(0.1),
+  /** Grabaciones de Speaking de cuentas sin institucion (dias). */
+  "exam.recordings.retentionDays": z.number().int().min(7).max(730).default(180),
+  /** Examinador con avatar (Tavus): lecciones de examen para el tutor en video. Usa minutos del tutor. */
+  "exam.avatarExaminer": z.boolean().default(false),
   /** Reportes de personas distintas que mandan un bloque a revision humana. */
   "exam.reportsToReview": z.number().int().min(1).max(50).default(3),
   "exam.writing.task2Weight": z.number().min(1).max(4).default(2),
+  /** Ajuste de las notas de la IA en IELTS (bandas), medido contra docentes y notas oficiales. */
+  "exam.grader.ieltsWritingOffset": z.number().min(-1).max(1).default(0),
+  "exam.grader.ieltsSpeakingOffset": z.number().min(-1).max(1).default(0),
   /** Cortes ESTIMADOS de TestDaF (escala 0–20 → TDN). */
   "exam.testdaf.cutoffs": z
     .object({ tdn5: z.number(), tdn4: z.number(), tdn3: z.number() })

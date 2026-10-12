@@ -985,8 +985,11 @@ model SpeakingSubmission {
   costMicroUsd BigInt      @default(0)
   createdAt    DateTime    @default(now())
   gradedAt     DateTime?
+  /// grabaciones borradas (plazo de retencion vencido o borrado a pedido)
+  audioPurgedAt DateTime?
 
   @@unique([attemptId, part])
+  @@index([audioPurgedAt, createdAt])
 }
 
 model ExamReport {
@@ -1134,6 +1137,26 @@ model ExamJob {
 }
 
 /// Nota oficial reportada por el usuario tras el examen real.
+/// Estadisticas de cada pregunta con uso real (calibracion Rasch, diaria).
+model ExamItemStat {
+  itemSetId      String
+  questionId     String
+  exam           ExamCode
+  /// respuestas usadas
+  n              Int
+  pCorrect       Float
+  /// dificultad Rasch en logits (media 0 por examen)
+  difficulty     Float
+  /// correlacion punto-biserial con el resto de la prueba
+  discrimination Float?
+  /// DEFECTIVE: discrimina mal o casi nadie acierta
+  flag           String?
+  updatedAt      DateTime @updatedAt
+
+  @@id([itemSetId, questionId])
+  @@index([exam, flag])
+}
+
 model OfficialResult {
   id        String   @id @default(uuid(7))
   userId    String

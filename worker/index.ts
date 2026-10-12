@@ -10,8 +10,10 @@ import { Client } from "pg";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { planBankGaps } from "@/server/exams/bank/planner";
+import { calibrateBank } from "@/server/exams/calibration";
 import { syncOpenMocks } from "@/server/exams/mock";
 import { closeExpiredPractice } from "@/server/exams/practice";
+import { purgeExpiredRecordings } from "@/server/exams/recordings";
 import { maintainOrgMembers } from "@/server/org";
 import { snapshotGroups } from "@/server/org/teaching";
 import { replanAll } from "@/server/study/plan";
@@ -51,6 +53,10 @@ const loops: Loop[] = [
   { name: "org-members", everyMs: 6 * 60 * 60_000, run: () => maintainOrgMembers() },
   { name: "org-snapshots", everyMs: 12 * 60 * 60_000, run: () => snapshotGroups() },
   { name: "exam-stale-jobs", everyMs: 5 * 60_000, run: () => recoverStaleJobs(20) },
+  /** Calibracion con uso real: estadisticas por pregunta, bloques defectuosos a revision y tablas por forma. */
+  { name: "exam-calibrate", everyMs: 24 * 60 * 60_000, run: () => calibrateBank() },
+  /** Grabaciones de Speaking vencidas segun el plazo de cada institucion. */
+  { name: "exam-recordings", everyMs: 24 * 60 * 60_000, run: () => purgeExpiredRecordings() },
   {
     name: "exam-bank",
     everyMs: 15 * 60_000,

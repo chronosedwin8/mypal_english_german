@@ -11,7 +11,7 @@ test("landing con exámenes y página por examen", async ({ page }) => {
   await expect(page.getByText("Haz una práctica gratis").first()).toBeVisible();
   await page.screenshot({ path: "test-results/ielts-page.png", fullPage: true });
   await page.goto("/goethe-b2");
-  await expect(page.getByText("Próximamente").first()).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole("heading", { level: 1, name: /Goethe-Zertifikat B2/ })).toBeVisible({ timeout: 60_000 });
   await page.goto("/no-existe");
   await expect(page.getByRole("heading", { name: "No encontramos esta página" })).toBeVisible({ timeout: 60_000 });
 });

@@ -1,4 +1,4 @@
-import { ArrowRightIcon, BookOpenTextIcon, ClockIcon, HeadphonesIcon, MicIcon, PenLineIcon } from "lucide-react";
+import { ArrowRightIcon, BookOpenTextIcon, ClockIcon, HeadphonesIcon, MicIcon, PenLineIcon, VideoIcon } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -198,6 +198,15 @@ async function MockCard({ user, exam }: { user: { id: string; role: "STUDENT" | 
   );
 }
 
+/** Leccion del tutor en video que hace de examinador (si el interruptor esta encendido). */
+const AVATAR_EXAMINER_LESSON: Record<ExamCode, string> = {
+  IELTS_ACADEMIC: "en-examen-ielts-speaking-completo",
+  GOETHE_B1: "de-examen-goethe-sprechen-goethe-b1",
+  GOETHE_B2: "de-examen-goethe-sprechen-goethe-b2",
+  GOETHE_C1: "de-examen-goethe-sprechen-goethe-b2",
+  TESTDAF: "de-examen-goethe-sprechen-testdaf",
+};
+
 async function SpeakingCard({ user, exam }: { user: { id: string; role: "STUDENT" | "SUPPORT" | "ADMIN" }; exam: ExamCode }) {
   const [access, quota, recentAll] = await Promise.all([
     can(user, "exam.speaking"),
@@ -211,6 +220,7 @@ async function SpeakingCard({ user, exam }: { user: { id: string; role: "STUDENT
   ]);
   const recent = recentAll.filter((a) => !(a.config as { mockId?: string }).mockId).slice(0, 3);
   const speakingSection = EXAMS[exam].sections.find((s) => s.section === "SPEAKING")!;
+  const examinerLesson = (await getConfig())["exam.avatarExaminer"] ? AVATAR_EXAMINER_LESSON[exam] : null;
   return (
     <div className="flex gap-4 rounded-3xl border bg-card p-5">
       <MicIcon className="mt-1 size-5 shrink-0 text-primary" />
@@ -243,6 +253,14 @@ async function SpeakingCard({ user, exam }: { user: { id: string; role: "STUDENT
               Ver el Pase de examen
             </Link>
           </div>
+        )}
+        {examinerLesson && (
+          <Link
+            href={`/app/clase?idioma=${exam === "IELTS_ACADEMIC" ? "EN_US" : "DE"}&leccion=${examinerLesson}`}
+            className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          >
+            <VideoIcon className="size-4" /> También cara a cara con el examinador en video (usa tus minutos del tutor)
+          </Link>
         )}
         {recent.length > 0 && (
           <ul className="mt-4 space-y-1 border-t pt-3 text-sm">

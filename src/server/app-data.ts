@@ -1,4 +1,5 @@
 /** Consultas de lectura para las paginas del estudiante. */
+import { EXAMINER_MODULE_PREFIX } from "@/content/modules";
 import type { TargetLang } from "@/generated/prisma/client";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
@@ -44,8 +45,9 @@ export async function recentSessions(userId: string, take = 5) {
 
 export async function lessonsFor(language: TargetLang, audience: "ADULT" | "KIDS" = "ADULT") {
   const lang = language === "DE" ? "DE" : "EN";
+  const examiner = (await getConfig())["exam.avatarExaminer"];
   return db.module.findMany({
-    where: { lang, audience, isPublished: true },
+    where: { lang, audience, isPublished: true, ...(examiner ? {} : { NOT: { slug: { startsWith: EXAMINER_MODULE_PREFIX } } }) },
     orderBy: [{ sortOrder: "asc" }],
     include: { lessons: { orderBy: { sortOrder: "asc" } } },
   });

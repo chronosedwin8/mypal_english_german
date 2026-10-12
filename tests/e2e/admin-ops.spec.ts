@@ -31,6 +31,13 @@ test("accesos, moderación, costos, auditoría y rol de soporte", async ({ brows
   await expect(page.getByRole("heading", { name: "Costos y presupuestos" })).toBeVisible({ timeout: 60_000 });
   await page.screenshot({ path: "test-results/admin-costos.png", fullPage: true });
 
+  // Calibración y precisión: el botón corre la calibración y deja un aviso.
+  await page.goto("/admin/calibracion");
+  await expect(page.getByRole("heading", { name: "Calibración y precisión" })).toBeVisible({ timeout: 60_000 });
+  await page.getByRole("button", { name: "Calibrar ahora" }).click();
+  await expect(page.getByText(/Calibración lista:/)).toBeVisible({ timeout: 90_000 });
+  await page.screenshot({ path: "test-results/admin-calibracion.png", fullPage: true });
+
   await page.goto("/admin/auditoria?accion=access.");
   await expect(page.getByRole("cell", { name: "access.rule", exact: true }).first()).toBeVisible({ timeout: 60_000 });
   const [download] = await Promise.all([page.waitForEvent("download"), page.getByRole("link", { name: "Exportar CSV" }).click()]);
@@ -49,6 +56,9 @@ test("accesos, moderación, costos, auditoría y rol de soporte", async ({ brows
   await studentPage.fill("#password", student.password);
   await studentPage.getByRole("button", { name: "Ingresar" }).click();
   await expect(studentPage).toHaveURL(/\/app/, { timeout: 30_000 });
+  await studentPage.goto("/app/seguridad");
+  await expect(studentPage.getByRole("heading", { name: "Tus grabaciones de Speaking" })).toBeVisible({ timeout: 60_000 });
+  await expect(studentPage.getByRole("button", { name: "Borrar mis grabaciones ahora" })).toBeDisabled();
   await studentPage.goto("/admin/accesos");
   await expect(studentPage.getByText("Modo soporte: solo lectura.")).toBeVisible({ timeout: 60_000 });
   await studentPage.locator("tr", { hasText: student.email }).getByRole("button", { name: "Quitar" }).click();

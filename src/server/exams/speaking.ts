@@ -11,6 +11,7 @@ import { createHash } from "node:crypto";
 import { z } from "zod";
 
 import { examSpec, partSpec } from "@/content/exams";
+import { toHalfBand } from "@/content/exams/scales";
 import type { ExamCode } from "@/content/exams/types";
 import type { Prisma } from "@/generated/prisma/client";
 import { can } from "@/server/access";
@@ -398,6 +399,8 @@ export type SpeakingFeedback = Omit<z.infer<typeof SpeakingGradeSchema>, "criter
   criteria: Record<string, { band: number; commentEs: string }>;
   criteriaLabels?: Record<string, string>;
   scale?: ScaleResult;
+  /** ajuste calibrado aplicado a la banda (bandas) */
+  adjustment?: number;
   metrics: ReturnType<typeof fluencyMetrics>;
   listenedSeconds: number;
 };
@@ -423,7 +426,7 @@ export async function gradeSpeaking(submissionId: string, opts: { finalAttempt: 
     const metrics = fluencyMetrics(turns);
     const answers = turns.filter((t): t is CandidateTurn => t.kind === "candidate");
     const longest = [...answers].sort((a, b) => b.durationMs - a.durationMs)[0];
-    const audio = longest && longest.durationMs > 3000 ? await storage().get(longest.audioKey) : null;
+    const audio = longest?.audioKey && longest.durationMs > 3000 ? await storage().get(longest.audioKey) : null;
     const mime = longest?.audioKey.endsWith(".m4a") ? "audio/mp4" : longest?.audioKey.endsWith(".ogg") ? "audio/ogg" : "audio/webm";
     if (sub.attempt.exam !== "IELTS_ACADEMIC") return await gradeSpeakingGerman(sub, turns, metrics, longest, audio, mime);
     const res = await ai().generateJson({
@@ -443,8 +446,14 @@ export async function gradeSpeaking(submissionId: string, opts: { finalAttempt: 
       refId: submissionId,
       audio: audio ? { data: audio, mimeType: mime } : undefined,
     });
-    const band = speakingBand(res.data.criteria);
-    const feedback: SpeakingFeedback = { ...res.data, metrics, listenedSeconds: audio ? Math.round(longest.durationMs / 1000) : 0 };
+    const adjustment = (await getConfig())["exam.grader.ieltsSpeakingOffset"];
+    const band = toHalfBand(speakingBand(res.data.criteria) + adjustment);
+    const feedback: SpeakingFeedback = {
+      ...res.data,
+      metrics,
+      listenedSeconds: audio ? Math.round(longest.durationMs / 1000) : 0,
+      ...(adjustment ? { adjustment } : {}),
+    };
     await db.speakingSubmission.update({
       where: { id: submissionId },
       data: {
@@ -530,7 +539,7 @@ export async function loadSpeakingResult(attemptId: string, userId: string) {
             turns.map(async (t) =>
               t.kind === "examiner"
                 ? { who: "examiner" as const, text: t.text, url: null }
-                : { who: "candidate" as const, text: t.transcript, url: await storage().signedUrl(t.audioKey, seconds) },
+                : { who: "candidate" as const, text: t.transcript, url: t.audioKey ? await storage().signedUrl(t.audioKey, seconds) : null },
             ),
           ),
         };

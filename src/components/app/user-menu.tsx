@@ -11,7 +11,7 @@ export async function UserMenu() {
     <UserMenuClient
       name={user.name}
       email={user.email}
-      isAdmin={user.role === "ADMIN"}
+      isAdmin={user.role === "ADMIN" || user.role === "SUPPORT"}
       isTeacher={roles.length > 0}
       isOrgAdmin={roles.some((r) => r.role === "ORG_ADMIN")}
     />

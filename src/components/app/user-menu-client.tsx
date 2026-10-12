@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2Icon, GraduationCapIcon, LogOutIcon, ShieldIcon, MoonIcon, SunIcon } from "lucide-react";
+import { Building2Icon, GraduationCapIcon, LockIcon, LogOutIcon, ShieldIcon, MoonIcon, SunIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -60,6 +60,9 @@ export function UserMenuClient({
             <Building2Icon /> Institución
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem render={<Link href="/app/seguridad" />}>
+          <LockIcon /> Seguridad y privacidad
+        </DropdownMenuItem>
         <DropdownMenuItem onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>
           {resolvedTheme === "dark" ? <SunIcon /> : <MoonIcon />} Tema {resolvedTheme === "dark" ? "claro" : "oscuro"}
         </DropdownMenuItem>

@@ -541,3 +541,76 @@ export const KIDS_MODULES: ModuleDef[] = [
     ],
   },
 ];
+
+/**
+ * Examinador con avatar (opcional, se activa en Configuracion): el tutor en video hace de
+ * examinador. Usa los minutos del tutor; la nota es informal (la oficial-estimada sale del
+ * Speaking por voz, que se califica con criterios).
+ */
+export const EXAMINER_MODULE_PREFIX = "examen-";
+
+const EXAMINER_RULES =
+  "EXAMINER MODE: for this class you are a certified examiner, not a tutor. Stay in role until the test ends: neutral, friendly and brief; do not correct, teach or praise during the test; never answer the questions for the candidate; if they ask what a word means, rephrase the question once. Keep to the timing below. Do not comment on what you see on camera. When the test is over (or one minute before the class ends), step out of the role and, IN SPANISH, give an informal estimate per criterion with one concrete tip each, and say clearly that it is an informal estimate, not an official result.";
+
+export const EXAMINER_MODULES: ModuleDef[] = [
+  {
+    slug: "examen-ielts-speaking",
+    lang: "EN",
+    level: "B2",
+    emoji: "🎓",
+    titleEs: "Examen: IELTS Speaking con examinador en video",
+    descriptionEs: "Simulacro cara a cara del Speaking de IELTS con Poly como examinadora.",
+    lessons: [
+      {
+        slug: "completo",
+        titleEs: "IELTS Speaking completo (Partes 1, 2 y 3)",
+        objectives: ["Responder como en el examen real, sin ayudas", "Recibir una banda informal por criterio"],
+        targetVocab: [],
+        tutorBrief: `${EXAMINER_RULES} IELTS Speaking, 11–14 minutes. Part 1 (4–5 min): introduce yourself, ask the candidate's name, then 8–10 short questions on two or three familiar topics (home, work or studies, hobbies). Part 2 (3–4 min): read out a cue card topic with three prompts ("You should say..."), give exactly one minute to prepare in silence, then ask them to speak for one to two minutes and stop them at two minutes; ask one short rounding-off question. Part 3 (4–5 min): a two-way discussion of abstract questions linked to the Part 2 topic, with follow-ups ("Why do you think...?"). Criteria for the final estimate: Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, Pronunciation (bands 1–9 in half bands).`,
+        suggestedMinutes: 14,
+      },
+      {
+        slug: "partes-2-3",
+        titleEs: "IELTS Speaking: Partes 2 y 3",
+        objectives: ["Hablar dos minutos con la tarjeta", "Discutir ideas abstractas con ejemplos"],
+        targetVocab: [],
+        tutorBrief: `${EXAMINER_RULES} IELTS Speaking Parts 2 and 3 only (about 9 minutes). Part 2: read a cue card topic with three prompts, give one minute to prepare in silence, then let them speak for up to two minutes. Part 3: four to five minutes of abstract discussion linked to the topic, with follow-ups. Criteria: Fluency and Coherence, Lexical Resource, Grammatical Range and Accuracy, Pronunciation.`,
+        suggestedMinutes: 9,
+      },
+    ],
+  },
+  {
+    slug: "examen-goethe-sprechen",
+    lang: "DE",
+    level: "B2",
+    emoji: "🎓",
+    titleEs: "Examen: Sprechen con examinadora en video",
+    descriptionEs: "Simulacro cara a cara del Sprechen del Goethe-Zertifikat y de TestDaF.",
+    lessons: [
+      {
+        slug: "goethe-b2",
+        titleEs: "Goethe B2 Sprechen (Vortrag y Diskussion)",
+        objectives: ["Presentar un tema con estructura", "Discutir y negociar con argumentos"],
+        targetVocab: [],
+        tutorBrief: `${EXAMINER_RULES} Goethe-Zertifikat B2 Sprechen, in German, about 15 minutes. You play both the examiner (Prüferin) and the other candidate. Teil 1 Vortrag (about 4 min): give the candidate a topic with two options and the structure to follow (introduce the topic, describe one or two options with pros and cons, give your opinion, conclude); one minute to prepare, then let them present; afterwards ask one question about the presentation, as the partner would. Teil 2 Diskussion (about 5 min): discuss a controversial everyday question with the candidate as their partner; disagree politely, ask for reasons, and react to their arguments. Criteria for the final estimate: Erfüllung, Kohärenz, Wortschatz, Strukturen, Aussprache (A–E).`,
+        suggestedMinutes: 15,
+      },
+      {
+        slug: "goethe-b1",
+        titleEs: "Goethe B1 Sprechen (planificar y presentar)",
+        objectives: ["Planificar algo juntos", "Presentar un tema y responder preguntas"],
+        targetVocab: [],
+        tutorBrief: `${EXAMINER_RULES} Goethe-Zertifikat B1 Sprechen, in German, about 14 minutes. You play both the examiner and the partner. Teil 1 (about 3 min): plan something together (e.g. a farewell party for a colleague) with four points to agree on. Teil 2 (about 4 min): the candidate presents a topic in five steps (introduce, personal experience, situation in their country, pros and cons with opinion, conclusion and thanks). Teil 3 (about 2 min): ask one or two questions about the presentation and react as the partner. Criteria: Erfüllung, Kohärenz, Wortschatz, Strukturen, Aussprache.`,
+        suggestedMinutes: 14,
+      },
+      {
+        slug: "testdaf",
+        titleEs: "TestDaF Sprechen (tareas académicas)",
+        objectives: ["Describir gráficos y procesos", "Dar recomendaciones y argumentar en contexto universitario"],
+        targetVocab: [],
+        tutorBrief: `${EXAMINER_RULES} TestDaF Sprechen, in German, about 12 minutes, university settings. Give four short tasks one at a time, each with a brief silent preparation time (30–60 seconds) and a speaking time of one to two minutes: (1) ask a fellow student for information about a course, (2) describe a chart you describe in words (e.g. how students finance their studies), (3) give advice and weigh options for a friend's study decision, (4) argue for or against a university policy and justify your position. Criteria: overall impression, task completion and language (TDN 3, 4 or 5).`,
+        suggestedMinutes: 12,
+      },
+    ],
+  },
+];

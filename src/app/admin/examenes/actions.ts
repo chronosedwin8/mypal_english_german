@@ -8,6 +8,7 @@ import { EXAM_CODES } from "@/content/exams";
 import { requireAdmin } from "@/server/auth/dal";
 import { db } from "@/server/db";
 import { bankTargets } from "@/server/exams/bank/targets";
+import { calibrateBank } from "@/server/exams/calibration";
 import { assembleForm } from "@/server/exams/forms";
 import { enqueue } from "@/server/jobs/queue";
 
@@ -73,4 +74,14 @@ export async function regenerateAudio(formData: FormData) {
   await enqueue("bank.audio", { itemSetId: id }, { dedupeKey: `audio:${id}:${Date.now()}` });
   await db.auditLog.create({ data: { actorUserId: admin.id, action: "bank.audio", entity: "ExamItemSet", entityId: id } });
   revalidatePath(`/admin/examenes/${id}`);
+}
+
+export async function runCalibration() {
+  const admin = await requireAdmin();
+  const summary = await calibrateBank();
+  await db.auditLog.create({ data: { actorUserId: admin.id, action: "exam.calibrate", entity: "ExamItemStat", after: summary as never } });
+  revalidatePath("/admin/calibracion");
+  const moved = summary.reduce((a, s) => a + s.sentToReview, 0);
+  const forms = summary.reduce((a, s) => a + s.formsCalibrated, 0);
+  redirect(`/admin/calibracion?aviso=${encodeURIComponent(`Calibración lista: ${moved} bloques a revisión, ${forms} formas calibradas.`)}`);
 }

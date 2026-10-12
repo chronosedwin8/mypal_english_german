@@ -12,6 +12,8 @@ Práctica conversacional de **inglés (EE. UU. y Reino Unido) y alemán** por vi
 - **Minutos con tope duro**: reserva previa, `max_call_duration` en Tavus, cobro al segundo (redondeo a 6 s, mínimo 30 s), cola cuando los cupos simultáneos están llenos.
 - **Pagos simulados** (planes, recargas, renovación, cancelación, reembolso) detrás de una interfaz intercambiable.
 - **Panel de administración** (`/admin`): márgenes real / peor caso / con fijo de Tavus, clases en vivo, usuarios, ledger, configuración e interruptor de emergencia.
+- **Exámenes** (`/app/examenes`, plan en [`docs/PLAN-EXAMENES.md`](docs/PLAN-EXAMENES.md)): IELTS Academic, Goethe B1/B2/C1 y TestDaF con banco generado por Gemini y validado, audios de ElevenLabs en S3, práctica, simulacro con escalas oficiales, Writing y Speaking calificados por IA con examinador de voz, plan de estudios, productos de $15 / $19 / $35 e instituciones con panel docente (estudiantes de 15 a 17 años solo por su institución).
+- **Operación**: segundo factor obligatorio para el admin en producción, rol de soporte de solo lectura, accesos y excepciones, moderación y "reportar pregunta", costos, auditoría con CSV, calibración Rasch con uso real y precisión frente a notas oficiales y docentes.
 
 ## Precios (margen mínimo garantizado ≥ 60 %)
 
@@ -46,7 +48,7 @@ pnpm dev       # http://localhost:3000
 pnpm worker    # vigilantes de clases, cola, vencimientos, renovaciones
 ```
 
-Hazte administrador: regístrate en la app y ejecuta `pnpm admin:promote tu-correo@ejemplo.com`.
+Hazte administrador: regístrate en la app y ejecuta `pnpm admin:promote tu-correo@ejemplo.com`, o crea la cuenta directamente con `ADMIN_PASSWORD='…' pnpm admin:create tu-correo@ejemplo.com "Tu nombre"` (la contraseña solo se lee de la variable de entorno; nunca la guardes en archivos). En producción el admin exige el segundo factor: actívalo en **Seguridad y privacidad** (`/app/seguridad`).
 
 En local los correos no se envían: ábrelos en **http://localhost:3000/dev/correo**.
 
@@ -62,6 +64,11 @@ En local los correos no se envían: ábrelos en **http://localhost:3000/dev/corr
 | `TAVUS_VOICE_EN_US/EN_GB/DE` | Voces por tutor (vacías = voz del PAL base) |
 | `ELEVENLABS_API_KEY` | Audios y transcripción del test de nivel |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile (en local: claves de prueba) |
+| `GEMINI_API_KEY`, `GEMINI_MODEL_PRO`, `GEMINI_MODEL_FLASH`, `AI_DRIVER` | Generación del banco y calificación (`AI_DRIVER=fake` para pruebas) |
+| `ELEVENLABS_DIALOGUE_MODEL`, `ELEVENLABS_EXAMINER_MODEL`, `ELEVENLABS_EXAM_VOICES_*`, `ELEVENLABS_EXAMINER_*` | Audios del banco y voz del examinador |
+| `AWS_*`, `S3_BUCKET`, `S3_PREFIX`, `S3_RECORDINGS_RETENTION_DAYS` | Bucket privado de audios (`pnpm s3:setup`); el ciclo de vida del bucket es solo un techo de seguridad |
+| `MINORS_AI_DRIVER` | Proveedor de IA en vivo para menores (vacío = sin corrección por IA para menores) |
+| `ADMIN_REQUIRE_2FA` | Segundo factor para el admin (vacío = solo en producción) |
 
 ### Probar con el avatar real
 
@@ -79,6 +86,16 @@ En local los correos no se envían: ábrelos en **http://localhost:3000/dev/corr
 | `pnpm typecheck` · `pnpm lint` · `pnpm build` | Calidad y build de producción |
 | `pnpm check:pricing` | Verifica el margen de todos los productos |
 | `pnpm tavus:setup [--dry-run] [--verify] [--force]` | Crea/actualiza los tutores en Tavus |
+| `pnpm bank inventory \| generate \| fill \| form \| audio` | Banco de exámenes desde la terminal (también desde `/admin/examenes`) |
+| `pnpm s3:setup [--check]` | Crea o verifica el bucket privado de audios |
+| `pnpm admin:create` · `pnpm admin:promote` | Cuenta de administrador |
+
+### Operación de exámenes (worker)
+
+- **Calibración diaria** (`/admin/calibracion`, botón *Calibrar ahora*): Rasch con las respuestas reales. Con `exam.calibration.minResponses` respuestas por pregunta se guardan su dificultad y discriminación. Las preguntas defectuosas mandan su bloque a revisión y dejan una alerta en Moderación. Las formas IELTS completas reciben su propia tabla de conversión, que los simulacros usan desde ese momento.
+- **Precisión**: el simulador frente a las notas oficiales que reportan los estudiantes (meta ±0,5 banda) y la IA frente a los docentes. Si el sesgo es claro, ajusta `exam.grader.ieltsWritingOffset` / `ieltsSpeakingOffset`.
+- **Grabaciones de Speaking**: se borran al vencer el plazo de la institución (o `exam.recordings.retentionDays` sin institución). Cada persona puede borrarlas antes en `/app/seguridad`. Se conservan la transcripción y la nota.
+- **Examinador con avatar** (opcional, `exam.avatarExaminer`): lecciones del tutor en video que hacen de examinador IELTS, Goethe o TestDaF. Usan los minutos del tutor.
 
 ## Arquitectura (resumen)
 
@@ -96,3 +113,7 @@ En local los correos no se envían: ábrelos en **http://localhost:3000/dev/corr
 - Revisar con un abogado los textos de `/legal/terminos` y `/legal/privacidad`.
 - Desplegar el worker como proceso permanente y configurar `PUBLIC_WEBHOOK_URL`.
 - Hacer las llamadas de calibración reales (ver `docs/PLAN.md`, fase 6) y confirmar el costo por minuto en el panel de Tavus.
+- Rotar las claves de AWS (también se compartieron en texto plano).
+- Completar el banco de alemán (`pnpm bank fill` cuando haya presupuesto diario de IA) y armar formas de simulacro.
+- Configurar `MINORS_AI_DRIVER` antes de vender a colegios con estudiantes menores.
+- Piloto con 20–30 estudiantes reales para calibrar formas y comparar con notas oficiales y de docentes.

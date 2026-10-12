@@ -37,7 +37,8 @@ async function main() {
   const bucket = required("S3_BUCKET");
   const region = required("AWS_REGION");
   const prefix = (process.env.S3_PREFIX ?? "mypal").replace(/\/+$/, "");
-  const recordingsDays = Number(process.env.S3_RECORDINGS_RETENTION_DAYS ?? 180);
+  // Techo de seguridad: el worker borra antes segun el plazo de cada institucion (maximo 730 dias).
+  const recordingsDays = Math.max(730, Number(process.env.S3_RECORDINGS_RETENTION_DAYS ?? 730));
   const appUrl = process.env.APP_URL ?? "http://localhost:3000";
   const s3 = new S3Client({ region });
 

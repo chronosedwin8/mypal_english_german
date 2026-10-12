@@ -7,6 +7,7 @@
 import { z } from "zod";
 
 import { examSpec, partSpec } from "@/content/exams";
+import { toHalfBand } from "@/content/exams/scales";
 import type { ExamCode } from "@/content/exams/types";
 import type { Prisma } from "@/generated/prisma/client";
 import { can } from "@/server/access";
@@ -58,6 +59,8 @@ const FeedbackSchema = GradeSchema.extend({
 type Grade = z.infer<typeof GradeSchema>;
 
 export interface WritingFeedback {
+  /** ajuste calibrado aplicado a la banda (bandas) */
+  adjustment?: number;
   /** IELTS: TA/CC/LR/GRA en bandas 0–9 · aleman: criterios del examen de 0 a 5 */
   criteria: Record<string, { band: number; commentEs: string }>;
   /** nombres de los criterios (aleman) */
@@ -259,7 +262,9 @@ export async function gradeWriting(submissionId: string, opts: { finalAttempt: b
     }
     const combined = combineGrades(grades);
     const criteria = Object.fromEntries(CRITERIA.map((c) => [c, { band: combined[c], commentEs: first.data.criteria[c].commentEs }])) as WritingFeedback["criteria"];
-    const band = taskBand(criteria);
+    // Ajuste calibrado contra docentes y notas oficiales (0 por defecto).
+    const adjustment = (await getConfig())["exam.grader.ieltsWritingOffset"];
+    const band = toHalfBand(taskBand(criteria) + adjustment);
     // Solo se marcan errores cuya cita aparece de verdad en el texto.
     const errors = first.data.errors.filter((e) => sub.text.includes(e.quote));
     const feedback: WritingFeedback = {
@@ -271,6 +276,7 @@ export async function gradeWriting(submissionId: string, opts: { finalAttempt: b
       modelAnswer: key.modelAnswer,
       rubricVersion: WRITING_RUBRIC_VERSION,
       graders: grades.length,
+      ...(adjustment ? { adjustment } : {}),
     };
     await db.$transaction([
       db.writingSubmission.update({

@@ -11,7 +11,7 @@ import { resolveFlagAction } from "../actions";
 
 export const metadata = { title: "Admin · Moderación" };
 
-const KIND_ES: Record<string, string> = { QUESTION: "Pregunta reportada", MINOR_SESSION: "Clase de menor", CONTENT: "Contenido marcado" };
+const KIND_ES: Record<string, string> = { QUESTION: "Pregunta reportada", CALIBRATION: "Calibración", MINOR_SESSION: "Clase de menor", CONTENT: "Contenido marcado" };
 
 export default function ModerationPage() {
   return (
@@ -41,7 +41,7 @@ async function Moderation() {
               </span>
             </div>
             <p className="mt-2 whitespace-pre-line">{f.note}</p>
-            {f.kind === "QUESTION" && f.refId && (
+            {(f.kind === "QUESTION" || f.kind === "CALIBRATION") && f.refId && (
               <Link href={`/admin/examenes/${f.refId.split("#")[0]}`} className="mt-1 inline-block text-primary hover:underline">
                 Ver el bloque (pregunta {f.refId.split("#")[1]})
               </Link>

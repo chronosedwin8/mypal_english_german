@@ -1,9 +1,9 @@
-import { KIDS_MODULES, MODULES } from "@/content/modules";
+import { EXAMINER_MODULES, KIDS_MODULES, MODULES } from "@/content/modules";
 import { db } from "@/server/db";
 
 export async function seedModules() {
   let lessons = 0;
-  const all = [...MODULES, ...KIDS_MODULES];
+  const all = [...MODULES, ...KIDS_MODULES, ...EXAMINER_MODULES];
   for (const [mi, m] of all.entries()) {
     const moduleId = `${m.lang.toLowerCase()}-${m.slug}`;
     const data = {

@@ -17,6 +17,7 @@ import { markPlanProgress } from "@/server/study/plan";
 import type { StudySection } from "@/server/study/planner-core";
 
 import type { PublicGroup, QuestionKey } from "./bank/schemas";
+import { mockFormTable } from "./calibration";
 import { formItemSetIds } from "./forms";
 import { objectiveScale, type ScaleResult } from "./profiles";
 import { isObjectiveCorrect } from "./scoring/objective";
@@ -366,12 +367,14 @@ export async function submitPractice(attemptId: string, userId: string): Promise
     perItem.set(item.id, stat);
   }
 
-  const table = config.section === "LISTENING" ? IELTS_LISTENING_TABLE : IELTS_READING_ACADEMIC_TABLE;
   const sectionTotal = sectionSpec(attempt.exam, config.section).rawMax;
   const full = attempt.mode === "SECTION" && total === sectionTotal;
+  // Simulacro con forma calibrada: sus propios cortes; si no, la tabla base.
+  const formTable = full && config.mockId && attempt.exam === "IELTS_ACADEMIC" ? await mockFormTable(config.mockId, config.section) : null;
+  const table = formTable ?? (config.section === "LISTENING" ? IELTS_LISTENING_TABLE : IELTS_READING_ACADEMIC_TABLE);
   // Con menos de 10 preguntas una banda no dice nada: solo se muestran los aciertos.
   const band = attempt.exam === "IELTS_ACADEMIC" && total >= 10 ?(full ? rawToBand(correct, table) : proportionalBand(correct, total, table)) : null;
-  const scale = objectiveScale(attempt.exam, config.section, correct, total, { full, cutoffs: (await getConfig())["exam.testdaf.cutoffs"] });
+  const scale = objectiveScale(attempt.exam, config.section, correct, total, { full, cutoffs: (await getConfig())["exam.testdaf.cutoffs"], table: formTable ?? undefined });
   const scores: PracticeScores = { correct, total, band, bandIsEstimate: !full, byTaskType, scale };
 
   await db.$transaction(async (tx) => {

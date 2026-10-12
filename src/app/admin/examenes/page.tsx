@@ -53,6 +53,9 @@ async function Bank({ searchParams }: { searchParams: PageProps<"/admin/examenes
             <b>{config.autoGenerate ? "activa" : "apagada"}</b> (se cambia en Configuración).
           </p>
         </div>
+        <Link href="/admin/calibracion" className="text-sm font-medium text-primary hover:underline">
+          Calibración y precisión →
+        </Link>
       </div>
 
       {aviso && <p className="rounded-xl border bg-card px-4 py-3 text-sm">{aviso}</p>}

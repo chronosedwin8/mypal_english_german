@@ -47,12 +47,12 @@ export function objectiveScale(
   section: ExamSectionCode,
   correct: number,
   total: number,
-  opts: { full: boolean; cutoffs?: TdnCutoffs },
+  opts: { full: boolean; cutoffs?: TdnCutoffs; table?: [number, number][] },
 ): ScaleResult | null {
   if (total < 10 && !opts.full) return null;
   const kind = scaleKind(exam);
   if (kind === "ielts") {
-    const table = section === "LISTENING" ? IELTS_LISTENING_TABLE : IELTS_READING_ACADEMIC_TABLE;
+    const table = opts.table ?? (section === "LISTENING" ? IELTS_LISTENING_TABLE : IELTS_READING_ACADEMIC_TABLE);
     const band = opts.full && total === 40 ? rawToBand(correct, table) : proportionalBand(correct, total, table);
     return { value: band, label: `Banda ${band.toFixed(1)}`, estimate: !(opts.full && total === 40) };
   }

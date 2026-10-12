@@ -41,7 +41,9 @@ export default function PrivacyPage() {
 
       <h2>Proveedores</h2>
       <p>
-        Tavus (video conversacional con IA), ElevenLabs (voz y transcripción), Cloudflare (seguridad) y la pasarela de pagos.
+        Tavus (video conversacional con IA), ElevenLabs (voz y transcripción), Google (Gemini: generación de preguntas y
+        calificación de Writing y Speaking), Amazon Web Services (almacenamiento cifrado de audios), Cloudflare (seguridad) y la
+        pasarela de pagos.
         Pueden procesar datos fuera de tu país con medidas de protección adecuadas.
       </p>
 
@@ -76,7 +78,20 @@ export default function PrivacyPage() {
       <p>
         Las preguntas de práctica se generan con inteligencia artificial y se revisan antes de publicarse. Los textos y las
         grabaciones que envías para calificar se procesan con proveedores de inteligencia artificial y de voz en niveles
-        pagos que no usan tus datos para entrenar sus modelos. Las notas son estimaciones, no resultados oficiales.
+        pagos que no usan tus datos para entrenar sus modelos. Las notas son estimaciones, no resultados oficiales, y MyPAL no
+        está afiliado a IELTS, al Goethe-Institut ni a TestDaF.
+      </p>
+      <p>
+        <strong>Grabaciones de Speaking:</strong> tu voz es un dato personal. Guardamos el audio de tus respuestas en un
+        almacenamiento privado y cifrado, solo para que tú (y tus docentes, si estudias con una institución) puedan
+        escucharlo. Se borra automáticamente al vencer el plazo de tu institución o, si estudias por tu cuenta, el plazo que ves
+        en <em>Seguridad y privacidad</em>. Puedes borrarlo antes desde esa misma página; la transcripción y la nota se
+        conservan. El soporte de MyPAL no abre grabaciones ni transcripciones de menores de edad.
+      </p>
+      <p>
+        <strong>Calibración:</strong> usamos tus respuestas de forma agregada y sin identificarte para medir la dificultad de
+        cada pregunta y retirar las defectuosas. Si nos reportas tu nota oficial, la comparamos con tus simulacros para medir la
+        precisión del simulador.
       </p>
 
       <h2>Conservación</h2>
