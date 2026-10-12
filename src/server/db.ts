@@ -11,7 +11,8 @@ function createClient() {
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString) throw new Error("Falta DATABASE_URL");
   return new PrismaClient({
-    adapter: new PrismaPg({ connectionString }),
+    // Sesiones en UTC: Prisma guarda fechas en UTC sin zona; las comparaciones SQL con now() deben coincidir.
+    adapter: new PrismaPg({ connectionString, options: "-c timezone=UTC" }),
     log: process.env.NODE_ENV === "development" ? ["warn", "error"] : ["error"],
   });
 }

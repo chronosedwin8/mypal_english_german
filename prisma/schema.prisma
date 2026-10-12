@@ -167,6 +167,9 @@ model User {
   trialClaim         TrialClaim?
   lessonProgress     LessonProgress[]
   corrections        SessionCorrection[]
+  examAttempts       ExamAttempt[]
+  studyPlans         StudyPlan[]
+  examEntitlements   ExamEntitlement[]
 
   @@index([emailCanonical])
   @@map("user")
@@ -750,4 +753,379 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([createdAt])
+}
+
+// ============================================================================
+// Examenes (IELTS Academic, Goethe B1/B2/C1, TestDaF) — ver docs/PLAN-EXAMENES.md
+// ============================================================================
+
+enum ExamCode {
+  IELTS_ACADEMIC
+  GOETHE_B1
+  GOETHE_B2
+  GOETHE_C1
+  TESTDAF
+}
+
+/// Hören, Lesen, Schreiben y Sprechen usan los mismos valores.
+enum ExamSection {
+  LISTENING
+  READING
+  WRITING
+  SPEAKING
+}
+
+enum ItemSetStatus {
+  DRAFT
+  REVIEW
+  APPROVED
+  REJECTED
+  RETIRED
+}
+
+enum ExamMode {
+  DRILL
+  PART
+  SECTION
+  WRITING
+  SPEAKING
+  REVIEW
+  ENTRY
+  MOCK
+}
+
+enum ExamAttemptStatus {
+  IN_PROGRESS
+  SCORING
+  COMPLETED
+  ABANDONED
+  VOIDED
+}
+
+enum ExamJobStatus {
+  QUEUED
+  RUNNING
+  DONE
+  FAILED
+}
+
+enum ExamQuotaKind {
+  MOCK
+  WRITING
+  SPEAKING
+}
+
+/// Bloque del banco: un texto o grabacion con sus preguntas, como en el examen real.
+model ExamItemSet {
+  id            String         @id @default(uuid(7))
+  exam          ExamCode
+  section       ExamSection
+  part          Int
+  taskTypes     String[]
+  /// dificultad en la escala del examen (banda IELTS o nivel numerico)
+  difficulty    Float
+  topic         String
+  /// contenido publico (texto, preguntas, opciones). Nunca incluye la clave.
+  content       Json
+  /// clave de respuestas y justificacion. NUNCA sale al navegador.
+  answerKey     Json
+  status        ItemSetStatus  @default(DRAFT)
+  promptVersion String
+  model         String
+  qualityScore  Float?
+  reviewNote    String?
+  costMicroUsd  BigInt         @default(0)
+  timesServed   Int            @default(0)
+  timesCorrect  Int            @default(0)
+  createdAt     DateTime       @default(now())
+  approvedAt    DateTime?
+  audio         AudioAsset[]
+  exposures     ItemExposure[]
+
+  @@index([exam, section, part, status, difficulty])
+  @@index([status, createdAt])
+}
+
+model AudioAsset {
+  id              String      @id @default(uuid(7))
+  itemSetId       String
+  itemSet         ExamItemSet @relation(fields: [itemSetId], references: [id], onDelete: Cascade)
+  storageKey      String      @unique
+  durationMs      Int
+  voices          Json
+  script          Json
+  /// similitud 0..1 entre la transcripcion (Scribe) y el guion
+  transcriptCheck Float?
+  characters      Int
+  costMicroUsd    BigInt      @default(0)
+  createdAt       DateTime    @default(now())
+
+  @@index([itemSetId])
+}
+
+/// Forma completa de simulacro: bloques en orden por seccion y parte.
+model ExamForm {
+  id         String        @id @default(uuid(7))
+  exam       ExamCode
+  version    Int
+  blocks     Json
+  conversion Json?
+  calibrated Boolean       @default(false)
+  status     ItemSetStatus @default(APPROVED)
+  createdAt  DateTime      @default(now())
+  attempts   ExamAttempt[]
+
+  @@unique([exam, version])
+}
+
+model ExamAttempt {
+  id          String               @id @default(uuid(7))
+  userId      String
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam        ExamCode
+  mode        ExamMode
+  formId      String?
+  form        ExamForm?            @relation(fields: [formId], references: [id])
+  status      ExamAttemptStatus    @default(IN_PROGRESS)
+  /// que se practica (seccion, parte, tipo de pregunta...)
+  config      Json
+  scores      Json?
+  overall     Float?
+  startedAt   DateTime             @default(now())
+  completedAt DateTime?
+  sections    ExamSectionAttempt[]
+  responses   ExamResponse[]
+  writing     WritingSubmission[]
+  speaking    SpeakingSubmission[]
+  report      ExamReport?
+
+  @@unique([userId], map: "one_open_mock_per_user", where: raw("((mode = 'MOCK'::\"ExamMode\") AND (status = ANY (ARRAY['IN_PROGRESS'::\"ExamAttemptStatus\", 'SCORING'::\"ExamAttemptStatus\"])))"))
+  @@index([userId, exam, startedAt(sort: Desc)])
+}
+
+model ExamSectionAttempt {
+  id          String      @id @default(uuid(7))
+  attemptId   String
+  attempt     ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  section     ExamSection
+  part        Int         @default(0)
+  itemSetIds  String[]
+  startedAt   DateTime    @default(now())
+  deadlineAt  DateTime?
+  submittedAt DateTime?
+  correct     Int?
+  total       Int?
+  score       Float?
+  audioPlays  Json        @default("{}")
+  tabSwitches Int         @default(0)
+
+  @@unique([attemptId, section, part])
+}
+
+model ExamResponse {
+  attemptId  String
+  attempt    ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  itemSetId  String
+  questionId String
+  answer     Json
+  isCorrect  Boolean?
+  timeMs     Int?
+  answeredAt DateTime    @default(now())
+
+  @@id([attemptId, itemSetId, questionId])
+}
+
+model WritingSubmission {
+  id           String      @id @default(uuid(7))
+  attemptId    String
+  attempt      ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  taskNumber   Int
+  itemSetId    String
+  text         String
+  words        Int
+  /// calificaciones independientes de la IA, por criterio
+  grades       Json        @default("[]")
+  finalScore   Float?
+  feedback     Json?
+  status       String      @default("PENDING")
+  costMicroUsd BigInt      @default(0)
+  createdAt    DateTime    @default(now())
+  gradedAt     DateTime?
+
+  @@unique([attemptId, taskNumber])
+}
+
+model SpeakingSubmission {
+  id           String      @id @default(uuid(7))
+  attemptId    String
+  attempt      ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  part         Int
+  itemSetId    String?
+  /// turnos: pregunta del examinador, audio del estudiante (clave S3), transcripcion
+  turns        Json        @default("[]")
+  transcript   String      @default("")
+  metrics      Json?
+  grades       Json        @default("[]")
+  finalScore   Float?
+  feedback     Json?
+  status       String      @default("IN_PROGRESS")
+  costMicroUsd BigInt      @default(0)
+  createdAt    DateTime    @default(now())
+  gradedAt     DateTime?
+
+  @@unique([attemptId, part])
+}
+
+model ExamReport {
+  attemptId    String      @id
+  attempt      ExamAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  strengths    Json
+  weaknesses   Json
+  timing       Json
+  narrative    String
+  improvements Json
+  createdAt    DateTime    @default(now())
+}
+
+model StudyPlan {
+  id           String          @id @default(uuid(7))
+  userId       String
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam         ExamCode
+  targets      Json
+  examDate     DateTime?
+  hoursPerWeek Int
+  days         Int[]
+  status       String          @default("ACTIVE")
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  items        StudyPlanItem[]
+
+  @@unique([userId, exam], map: "one_active_plan_per_exam", where: raw("(status = 'ACTIVE'::text)"))
+}
+
+model StudyPlanItem {
+  id              String       @id @default(uuid(7))
+  planId          String
+  plan            StudyPlan    @relation(fields: [planId], references: [id], onDelete: Cascade)
+  weekStart       DateTime
+  dueDate         DateTime
+  kind            String
+  section         ExamSection?
+  taskType        String?
+  minutes         Int
+  title           String
+  status          String       @default("TODO")
+  origin          String       @default("INITIAL")
+  sourceAttemptId String?
+  createdAt       DateTime     @default(now())
+
+  @@index([planId, weekStart])
+}
+
+/// Dominio estimado por tipo de pregunta o criterio (0..1) con su error.
+model SkillMastery {
+  userId    String
+  exam      ExamCode
+  key       String
+  value     Float
+  se        Float
+  n         Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([userId, exam, key])
+}
+
+model ItemExposure {
+  userId    String
+  itemSetId String
+  itemSet   ExamItemSet @relation(fields: [itemSetId], references: [id], onDelete: Cascade)
+  mode      ExamMode
+  seenAt    DateTime    @default(now())
+
+  @@id([userId, itemSetId, mode])
+  @@index([userId, mode])
+}
+
+/// Cupos por periodo (simulacros, correcciones de Writing, partes de Speaking).
+model ExamEntitlement {
+  id          String        @id @default(uuid(7))
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        ExamQuotaKind
+  periodStart DateTime
+  periodEnd   DateTime
+  granted     Int
+  used        Int           @default(0)
+  reserved    Int           @default(0)
+  /// "plan:<pagoId>:MOCK" | "admin:<auditId>" ...
+  sourceKey   String        @unique
+  createdAt   DateTime      @default(now())
+
+  @@index([userId, kind, periodEnd])
+}
+
+/// Solo insercion.
+model ExamUsageEvent {
+  id             BigInt        @id @default(autoincrement())
+  entitlementId  String
+  userId         String
+  kind           ExamQuotaKind
+  type           String
+  amount         Int
+  attemptId      String?
+  idempotencyKey String        @unique
+  createdAt      DateTime      @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/// Cada llamada a un proveedor de IA o voz (alimenta el panel de costos). Solo insercion.
+model AiUsage {
+  id           BigInt   @id @default(autoincrement())
+  provider     String
+  model        String
+  purpose      String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  characters   Int      @default(0)
+  seconds      Float    @default(0)
+  costMicroUsd BigInt   @default(0)
+  userId       String?
+  refId        String?
+  ok           Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([purpose, createdAt])
+}
+
+/// Cola de trabajos largos de IA (FOR UPDATE SKIP LOCKED).
+model ExamJob {
+  id        String        @id @default(uuid(7))
+  type      String
+  payload   Json
+  status    ExamJobStatus @default(QUEUED)
+  attempts  Int           @default(0)
+  runAfter  DateTime      @default(now())
+  lockedAt  DateTime?
+  error     String?
+  result    Json?
+  dedupeKey String?       @unique
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@index([status, runAfter])
+}
+
+/// Nota oficial reportada por el usuario tras el examen real.
+model OfficialResult {
+  id        String   @id @default(uuid(7))
+  userId    String
+  exam      ExamCode
+  scores    Json
+  takenAt   DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }

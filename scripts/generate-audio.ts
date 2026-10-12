@@ -16,13 +16,8 @@ import { DE_ITEMS } from "@/content/diagnostic/de";
 import { EN_ITEMS } from "@/content/diagnostic/en";
 import { SPEAKING_TASKS } from "@/content/diagnostic/speaking";
 import type { CefrLevel } from "@/content/diagnostic/types";
-import {
-  DIAGNOSTIC_VOICES,
-  VARIANTS_FOR_BASE,
-  diagnosticAudioPath,
-  speakingAudioPath,
-  type Variant,
-} from "@/lib/voices";
+import { VARIANTS_FOR_BASE, diagnosticAudioPath, speakingAudioPath, type Variant } from "@/lib/voices";
+import { diagnosticVoices } from "@/server/speech/voices";
 import { textToSpeech } from "@/server/speech/elevenlabs";
 
 const dryRun = process.argv.includes("--dry-run");
@@ -48,7 +43,7 @@ function jobs(): Job[] {
     const listening = items.filter((i) => i.skill === "LISTENING" && i.audioText);
     for (const variant of VARIANTS_FOR_BASE[base]) {
       listening.forEach((item, idx) => {
-        const voices = DIAGNOSTIC_VOICES[variant];
+        const voices = diagnosticVoices(variant);
         out.push({
           file: diagnosticAudioPath(variant, item.id),
           text: item.audioText!,
@@ -65,7 +60,7 @@ function jobs(): Job[] {
       out.push({
         file: speakingAudioPath(variant, task.id),
         text: task.text,
-        voiceId: DIAGNOSTIC_VOICES[variant][0].id,
+        voiceId: diagnosticVoices(variant)[0].id,
         speed: task.band === "low" ? 0.9 : 1,
         label: `${variant} ${task.id}`,
       });

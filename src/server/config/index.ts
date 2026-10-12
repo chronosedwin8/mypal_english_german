@@ -41,6 +41,47 @@ export const CONFIG_SCHEMA = {
   /** Niños: clases mas cortas (atencion) */
   "kids.maxSessionSeconds": z.number().int().min(120).max(1800).default(10 * 60),
 
+  /** IA (Gemini). Los modelos por defecto vienen de .env; aqui se pueden cambiar sin desplegar. */
+  "ai.model.generate": z.string().default(process.env.GEMINI_MODEL_PRO ?? ""),
+  "ai.model.grade": z.string().default(process.env.GEMINI_MODEL_PRO ?? ""),
+  "ai.model.solve": z.string().default(process.env.GEMINI_MODEL_FLASH ?? ""),
+  "ai.model.judge": z.string().default(process.env.GEMINI_MODEL_FLASH ?? ""),
+  "ai.model.examiner": z.string().default(process.env.GEMINI_MODEL_FLASH ?? ""),
+  /** Precio por millon de tokens (USD) por modelo; el razonamiento se cobra como salida. */
+  "ai.pricing": z
+    .record(z.string(), z.object({ inUsdPerM: z.number().min(0), outUsdPerM: z.number().min(0) }))
+    .default({
+      "gemini-3.1-pro-preview": { inUsdPerM: 2, outUsdPerM: 12 },
+      "gemini-3.8-flash": { inUsdPerM: 0.75, outUsdPerM: 3.75 },
+    }),
+  /** Tope de gasto diario en IA + voz para examenes (USD). Al alcanzarlo, se pausa. */
+  "ai.dailyBudgetUsd": z.number().min(0).default(10),
+  /** Costo de voz ElevenLabs por 1.000 caracteres (USD) y de Scribe por hora. */
+  "voice.ttsUsdPer1kChars": z.number().min(0).default(0.08),
+  "voice.sttUsdPerHour": z.number().min(0).default(0.22),
+
+  /** Examenes */
+  "exam.enabled": z.boolean().default(true),
+  "exam.enabledExams": z
+    .array(z.enum(["IELTS_ACADEMIC", "GOETHE_B1", "GOETHE_B2", "GOETHE_C1", "TESTDAF"]))
+    .default(["IELTS_ACADEMIC", "GOETHE_B1", "GOETHE_B2", "GOETHE_C1", "TESTDAF"]),
+  /** Bloques aprobados minimos por examen/seccion/parte; el worker repone si baja. */
+  "exam.bank.minPerPart": z.number().int().min(0).max(200).default(3),
+  /** El worker genera banco automaticamente (gasta IA). Apagado = solo con script o admin. */
+  "exam.bank.autoGenerate": z.boolean().default(false),
+  /** Fraccion de bloques aprobados que pasan a revision humana. */
+  "exam.bank.humanReviewSample": z.number().min(0).max(1).default(0.2),
+  "exam.bank.judgeMinScore": z.number().min(0).max(10).default(7),
+  /** Generacion al momento en practica dirigida (por usuario y dia). */
+  "exam.adhoc.dailyPerUser": z.number().int().min(0).max(50).default(3),
+  "exam.writing.task2Weight": z.number().min(1).max(4).default(2),
+  /** Cortes ESTIMADOS de TestDaF (escala 0–20 → TDN). */
+  "exam.testdaf.cutoffs": z
+    .object({ tdn5: z.number(), tdn4: z.number(), tdn3: z.number() })
+    .default({ tdn5: 16, tdn4: 12, tdn3: 8 }),
+  /** Validez de las URLs prefirmadas de audio (segundos). */
+  "exam.audioUrlSeconds": z.number().int().min(30).max(3600).default(300),
+
   /** Cola */
   "queue.offerSeconds": z.number().int().min(15).max(300).default(45),
 

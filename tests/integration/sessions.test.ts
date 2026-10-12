@@ -16,6 +16,7 @@ import {
   requestEnd,
   startSession,
   syncSlots,
+  maintainQueue,
   type StartInput,
 } from "@/server/sessions/lifecycle";
 import { killOrphans, sweepSessions } from "@/server/sessions/sweep";
@@ -234,6 +235,26 @@ describe("concurrencia global y cola", () => {
     const head = users[3];
     const claimed = await startSession(input(head, { queueEntryId: queued[0].queueEntryId }));
     expect(claimed.kind).toBe("started");
+  });
+});
+
+describe("vencimiento de ofertas de cupo (zona horaria)", () => {
+  it("una oferta vencida pasa al siguiente de la fila", async () => {
+    const users = await Promise.all(Array.from({ length: 5 }, () => paidUser(3600)));
+    const results = [];
+    for (const u of users) results.push(await startSession(input(u)));
+    const queued = results.filter((r) => r.kind === "queued") as { queueEntryId: string }[];
+    clock += 30_000;
+    await requestEnd((results[0] as { sessionId: string }).sessionId, "USER_END");
+    const slot = await db.concurrencySlot.findFirstOrThrow({ where: { state: "OFFERED" } });
+    expect(slot.queueEntryId).toBe(queued[0].queueEntryId);
+    // La primera persona de la fila no reclama a tiempo.
+    await db.concurrencySlot.update({ where: { id: slot.id }, data: { offeredUntil: new Date(Date.now() - 1000) } });
+    await maintainQueue();
+    const after = await db.concurrencySlot.findUniqueOrThrow({ where: { id: slot.id } });
+    expect(after.state).toBe("OFFERED");
+    expect(after.queueEntryId).toBe(queued[1].queueEntryId);
+    expect((await db.sessionQueueEntry.findUniqueOrThrow({ where: { id: queued[0].queueEntryId } })).status).toBe("EXPIRED");
   });
 });
 
