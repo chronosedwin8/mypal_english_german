@@ -1,5 +1,5 @@
 /**
- * Worker de MyPAL: vigilantes de clases, cola, vencimientos e invariantes.
+ * Worker de MyPAL: vigilantes de clases, cola, vencimientos, invariantes y trabajos de examenes.
  *   pnpm worker
  * Solo corre un worker a la vez (candado de Postgres); si hay otro, este espera.
  */
@@ -9,6 +9,9 @@ import { Client } from "pg";
 
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
+import { planBankGaps } from "@/server/exams/bank/planner";
+import { processJobs } from "@/server/jobs/handlers";
+import { recoverStaleJobs } from "@/server/jobs/queue";
 import { checkLedgerInvariants } from "@/server/ledger/wallet";
 import { runRenewals } from "@/server/payments/renewals";
 import { maintainQueue, syncSlots } from "@/server/sessions/lifecycle";
@@ -34,6 +37,19 @@ const loops: Loop[] = [
   { name: "expire", everyMs: 10 * 60_000, run: () => expireBuckets() },
   { name: "renewals", everyMs: 10 * 60_000, run: () => runRenewals() },
   { name: "slots", everyMs: 60_000, run: () => syncSlots() },
+  /** Examenes: cola de trabajos de IA (banco, calificaciones). */
+  { name: "exam-jobs", everyMs: 3_000, run: () => processJobs(2) },
+  { name: "exam-stale-jobs", everyMs: 5 * 60_000, run: () => recoverStaleJobs(20) },
+  {
+    name: "exam-bank",
+    everyMs: 15 * 60_000,
+    run: async () => {
+      const config = await getConfig();
+      if (!config["exam.enabled"] || !config["exam.bank.autoGenerate"]) return;
+      const n = await planBankGaps();
+      if (n) console.log(`[worker] banco: ${n} bloques encolados`);
+    },
+  },
   {
     name: "invariants",
     everyMs: 6 * 60 * 60_000,

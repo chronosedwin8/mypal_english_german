@@ -53,7 +53,20 @@ export async function updateConfig(formData: FormData) {
   if (!schema) throw new Error("Clave desconocida");
   const raw = formData.get("value");
   const def = schema.parse(undefined);
-  const value = typeof def === "boolean" ? raw === "on" || raw === "true" : typeof def === "number" ? Number(raw) : String(raw);
+  let value: unknown;
+  if (typeof def === "boolean") value = raw === "on" || raw === "true";
+  else if (typeof def === "number") value = Number(raw);
+  else if (typeof def === "object" && def !== null) {
+    // Listas y tablas (p. ej. bandas objetivo, precios de modelos) se editan como JSON.
+    try {
+      value = JSON.parse(String(raw));
+    } catch {
+      redirect(`/admin/configuracion?error=${encodeURIComponent(`${key}: el JSON no es válido`)}#${key}`);
+    }
+  } else value = String(raw);
+  const parsed = schema.safeParse(value);
+  if (!parsed.success)
+    redirect(`/admin/configuracion?error=${encodeURIComponent(`${key}: ${parsed.error.issues[0]?.message ?? "valor no válido"}`)}#${key}`);
   await setConfig(key, value, admin.id);
   if (key === "concurrency.limit") await syncSlots();
   revalidatePath("/admin/configuracion");

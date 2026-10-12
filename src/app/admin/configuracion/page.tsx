@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Textarea } from "@/components/ui/textarea";
 import { requireAdmin } from "@/server/auth/dal";
 import { CONFIG_SCHEMA, getConfig, type ConfigKey } from "@/server/config";
 
@@ -32,29 +33,61 @@ const LABELS: Partial<Record<ConfigKey, string>> = {
   "diagnostic.maxAttemptsPerIpPerDay": "Tests de nivel por IP al día",
   "diagnostic.speakingEnabled": "Parte oral del test (ElevenLabs Scribe)",
   "diagnostic.maxSpeakingSeconds": "Máximo por grabación del test (segundos)",
+  "ai.model.generate": "Modelo de IA para generar el banco",
+  "ai.model.grade": "Modelo de IA para calificar Writing y Speaking",
+  "ai.model.solve": "Modelo de IA del resolutor a ciegas",
+  "ai.model.judge": "Modelo de IA del juez de estilo",
+  "ai.model.examiner": "Modelo de IA del examinador por voz",
+  "ai.pricing": "Precios por millón de tokens de cada modelo (USD, JSON)",
+  "ai.dailyBudgetUsd": "Tope diario de gasto en IA y voz (USD)",
+  "voice.ttsUsdPer1kChars": "Costo de voz ElevenLabs por 1.000 caracteres (USD)",
+  "voice.sttUsdPerHour": "Costo de Scribe por hora de audio (USD)",
+  "voice.monthlyCharBudget": "Tope mensual de caracteres de voz del banco",
+  "exam.enabled": "Exámenes activos",
+  "exam.enabledExams": "Exámenes disponibles (JSON)",
+  "exam.bank.minPerPart": "Bloques aprobados mínimos por parte",
+  "exam.bank.autoGenerate": "El worker repone el banco automáticamente (gasta IA)",
+  "exam.bank.humanReviewSample": "Fracción de bloques que va a revisión humana (0–1)",
+  "exam.bank.judgeMinScore": "Puntaje mínimo del juez para publicar (0–10)",
+  "exam.bank.reviewBelowClarity": "Claridad bajo la cual un bloque va a revisión (0–10)",
+  "exam.bank.targetBands": "Bandas objetivo del banco IELTS (JSON)",
+  "exam.bank.solverMinAgreement": "Aciertos mínimos del resolutor a ciegas (0,5–1)",
+  "exam.bank.audioMinMatch": "Coincidencia mínima audio/guion según Scribe (0–1)",
+  "exam.audio.maxCharsPerRequest": "Caracteres por solicitud de audio a ElevenLabs",
+  "exam.adhoc.dailyPerUser": "Generaciones al momento por usuario y día",
+  "exam.writing.task2Weight": "Peso de Writing Tarea 2 frente a Tarea 1",
+  "exam.testdaf.cutoffs": "Cortes estimados TestDaF → TDN (JSON)",
+  "exam.audioUrlSeconds": "Validez de las URLs de audio (segundos)",
+  "kids.maxSessionSeconds": "Máximo por clase en modo niños (segundos)",
 };
 
-export default function ConfigPage() {
+export default function ConfigPage(props: PageProps<"/admin/configuracion">) {
   return (
     <Suspense fallback={<Skeleton className="h-96 w-full rounded-2xl" />}>
-      <Config />
+      <Config searchParams={props.searchParams} />
     </Suspense>
   );
 }
 
-async function Config() {
+async function Config({ searchParams }: { searchParams: PageProps<"/admin/configuracion">["searchParams"] }) {
   await requireAdmin();
+  const { error } = await searchParams;
   const config = await getConfig({ fresh: true });
   const keys = Object.keys(CONFIG_SCHEMA) as ConfigKey[];
   return (
     <div className="space-y-6">
       <h1 className="font-heading text-3xl font-extrabold">Configuración</h1>
       <p className="text-muted-foreground">Cada cambio queda registrado en la auditoría.</p>
+      {typeof error === "string" && (
+        <p role="alert" className="rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </p>
+      )}
       <div className="divide-y rounded-2xl border bg-card">
         {keys.map((key) => {
           const value = config[key];
           return (
-            <form key={key} action={updateConfig} className="flex flex-wrap items-center gap-4 p-4">
+            <form key={key} id={key} action={updateConfig} className="flex flex-wrap items-center gap-4 p-4">
               <input type="hidden" name="key" value={key} />
               <div className="min-w-64 flex-1">
                 <p className="font-medium">{LABELS[key] ?? key}</p>
@@ -68,9 +101,20 @@ async function Config() {
                     {value ? "Desactivar" : "Activar"}
                   </Button>
                 </>
+              ) : typeof value === "object" && value !== null ? (
+                <>
+                  <Textarea
+                    name="value"
+                    defaultValue={JSON.stringify(value, null, 2)}
+                    rows={Math.min(8, JSON.stringify(value, null, 2).split("\n").length)}
+                    spellCheck={false}
+                    className="w-full max-w-md font-mono text-xs"
+                  />
+                  <Button type="submit" size="sm" variant="outline">Guardar</Button>
+                </>
               ) : (
                 <>
-                  <Input name="value" defaultValue={String(value)} className="w-40" />
+                  <Input name="value" defaultValue={String(value)} className={typeof value === "string" ? "w-64" : "w-40"} />
                   <Button type="submit" size="sm" variant="outline">Guardar</Button>
                 </>
               )}

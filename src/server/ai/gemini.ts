@@ -20,11 +20,23 @@ function genai(): GoogleGenAI {
   return client;
 }
 
-/** JSON Schema compatible: sin $schema y sin claves que Gemini no necesita. */
+/**
+ * Limites de cantidad de los arreglos: Gemini rechaza esquemas con muchos de ellos
+ * ("invalid argument"). Se quitan del esquema enviado; Zod los valida igual despues
+ * y, si no cumplen, se pide la correccion.
+ */
+const STRIPPED_KEYS = new Set(["$schema", "minItems", "maxItems"]);
+
+function strip(node: unknown): unknown {
+  if (Array.isArray(node)) return node.map(strip);
+  if (node && typeof node === "object")
+    return Object.fromEntries(Object.entries(node).filter(([k]) => !STRIPPED_KEYS.has(k)).map(([k, v]) => [k, strip(v)]));
+  return node;
+}
+
+/** JSON Schema compatible con Gemini. */
 function toGeminiSchema(schema: z.ZodType): unknown {
-  const json = z.toJSONSchema(schema, { target: "draft-2020-12", unrepresentable: "any" }) as Record<string, unknown>;
-  delete json.$schema;
-  return json;
+  return strip(z.toJSONSchema(schema, { target: "draft-2020-12", unrepresentable: "any" }));
 }
 
 export class GeminiProvider implements AiProvider {

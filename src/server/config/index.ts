@@ -59,6 +59,8 @@ export const CONFIG_SCHEMA = {
   /** Costo de voz ElevenLabs por 1.000 caracteres (USD) y de Scribe por hora. */
   "voice.ttsUsdPer1kChars": z.number().min(0).default(0.08),
   "voice.sttUsdPerHour": z.number().min(0).default(0.22),
+  /** Tope mensual de caracteres de voz para el banco (la cuenta de ElevenLabs es compartida). */
+  "voice.monthlyCharBudget": z.number().int().min(0).default(300_000),
 
   /** Examenes */
   "exam.enabled": z.boolean().default(true),
@@ -72,6 +74,16 @@ export const CONFIG_SCHEMA = {
   /** Fraccion de bloques aprobados que pasan a revision humana. */
   "exam.bank.humanReviewSample": z.number().min(0).max(1).default(0.2),
   "exam.bank.judgeMinScore": z.number().min(0).max(10).default(7),
+  /** Bloques con claridad (segun el juez) menor a esto van siempre a revision humana. */
+  "exam.bank.reviewBelowClarity": z.number().min(0).max(10).default(8),
+  /** Bandas objetivo del banco IELTS; el generador equilibra el inventario entre ellas. */
+  "exam.bank.targetBands": z.array(z.number().min(4).max(9)).min(1).default([5.5, 6.5, 7.5]),
+  /** Fraccion de preguntas que el resolutor a ciegas debe acertar (1 = todas). */
+  "exam.bank.solverMinAgreement": z.number().min(0.5).max(1).default(1),
+  /** Fraccion minima del guion que Scribe debe reconocer en el audio generado. */
+  "exam.bank.audioMinMatch": z.number().min(0).max(1).default(0.85),
+  /** Caracteres por solicitud a ElevenLabs Text to Dialogue (limite ~2.000). */
+  "exam.audio.maxCharsPerRequest": z.number().int().min(300).max(2000).default(1800),
   /** Generacion al momento en practica dirigida (por usuario y dia). */
   "exam.adhoc.dailyPerUser": z.number().int().min(0).max(50).default(3),
   "exam.writing.task2Weight": z.number().min(1).max(4).default(2),
