@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 
 import { Skeleton } from "@/components/ui/skeleton";
-import { PLANS, TOPUPS, formatUsd } from "@/lib/pricing/catalog";
-import { DEFAULT_COSTS, worstCaseMargin } from "@/lib/pricing/margin";
+import { EXAM_PRODUCTS, ORG_LICENSES, PLANS, TOPUPS, formatUsd } from "@/lib/pricing/catalog";
+import { DEFAULT_COSTS, examProductMargin, worstCaseMargin } from "@/lib/pricing/margin";
 import { cn } from "@/lib/utils";
-import { businessMetrics } from "@/server/admin/metrics";
-import { requireAdmin } from "@/server/auth/dal";
+import { businessMetrics, examMetrics } from "@/server/admin/metrics";
+import { requireStaff } from "@/server/auth/dal";
 import { getConfig } from "@/server/config";
 
 export const metadata = { title: "Admin · Resumen" };
@@ -34,8 +34,8 @@ function Kpi({ label, value, hint, tone }: { label: string; value: string; hint?
 }
 
 async function Metrics() {
-  await requireAdmin();
-  const [m, config] = await Promise.all([businessMetrics(), getConfig()]);
+  await requireStaff();
+  const [m, config, x] = await Promise.all([businessMetrics(), getConfig(), examMetrics()]);
   const toneFor = (v: number | null) => (v === null ? undefined : v >= m.targetMargin ? "good" : "bad");
   const costs = { ...DEFAULT_COSTS, tavusCostPerMinUsd: config["tavus.costPerMinMicroUsd"] / 1_000_000 };
 
@@ -68,6 +68,35 @@ async function Metrics() {
         />
         <Kpi label="Margen con fijo de Tavus" value={pct(m.fullyLoadedMargin)} tone={toneFor(m.fullyLoadedMargin)} hint="Incluye la cuota mensual del plan Tavus" />
       </div>
+
+      <section className="space-y-4">
+        <h2 className="font-heading text-xl font-bold">Exámenes e instituciones</h2>
+        {(x.flags > 0 || x.failedJobs > 0 || x.todayCents >= x.dailyBudgetCents * 0.8) && (
+          <div className="flex flex-wrap gap-2 text-sm">
+            {x.flags > 0 && <span className="rounded-full bg-amber-100 px-3 py-1 font-semibold text-amber-900">{x.flags} alertas de moderación abiertas</span>}
+            {x.failedJobs > 0 && <span className="rounded-full bg-rose-100 px-3 py-1 font-semibold text-rose-900">{x.failedJobs} trabajos de IA fallidos este mes</span>}
+            {x.todayCents >= x.dailyBudgetCents * 0.8 && (
+              <span className="rounded-full bg-rose-100 px-3 py-1 font-semibold text-rose-900">
+                IA y voz hoy: {usd(x.todayCents)} de {usd(x.dailyBudgetCents)}
+              </span>
+            )}
+          </div>
+        )}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Kpi label="Ingresos por exámenes" value={usd(x.examRevenueCents)} hint={x.examByProduct.map((p) => `${p.planId}: ${p.count}`).join(" · ") || "sin ventas este mes"} />
+          <Kpi label="Licencias institucionales (mes)" value={usd(x.licenseMonthlyCents)} hint={`${x.licenseUsed} de ${x.licenseSeats} licencias en uso`} />
+          <Kpi label="IA y voz por uso" value={usd(x.variableAiCostCents)} hint={`${x.writing} Writing · ${x.speaking} Speaking · ${x.mocks} simulacros`} />
+          <Kpi label="Producción del banco (fijo)" value={usd(x.bankCostCents)} hint={`${x.bank.APPROVED ?? 0} aprobados · ${x.bank.REVIEW ?? 0} por revisar`} />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Kpi
+            label="Margen de exámenes (peor caso del mes)"
+            value={pct(x.examRevenueCents + x.licenseMonthlyCents > 0 ? (x.examRevenueCents + x.licenseMonthlyCents - x.examFeeCents - x.variableAiCostCents) / (x.examRevenueCents + x.licenseMonthlyCents) : null)}
+            hint="Ingresos de exámenes y licencias − comisiones − IA y voz por uso"
+          />
+          <Kpi label="Uso interno del administrador" value={usd(x.internalAiCostCents)} hint={`Costo interno, fuera del margen · por proveedor: ${x.byProvider.map((p) => `${p.provider} ${usd(p.cents)}`).join(" · ")}`} />
+        </div>
+      </section>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border bg-card p-6">
@@ -122,6 +151,36 @@ async function Metrics() {
                   <td className="py-2 font-medium">{row.name}</td>
                   <td>{formatUsd(row.price)}</td>
                   <td>{row.s / 60}</td>
+                  <td className={cn("text-right font-semibold tabular-nums", mm.meetsTarget ? "text-[oklch(0.55_0.15_160)]" : "text-destructive")}>
+                    {(mm.margin * 100).toFixed(1)} %
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+        <table className="mt-6 w-full text-sm">
+          <thead className="text-left text-muted-foreground">
+            <tr>
+              <th className="py-2">Producto de examen</th>
+              <th>Precio</th>
+              <th>Cupos (simulacros · Writing · Speaking)</th>
+              <th className="text-right">Margen mínimo</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              ...EXAM_PRODUCTS.map((p) => ({ name: p.nameEs, price: p.priceUsdCents, q: p.examQuotas!, addon: p.kind === "EXAM_ADDON" })),
+              ...ORG_LICENSES.map((l) => ({ name: `${l.nameEs} (por estudiante)`, price: l.priceUsdCents, q: l.examQuotas, addon: false })),
+            ].map((row) => {
+              const mm = examProductMargin({ priceUsdCents: row.price, quotas: row.q, addon: row.addon });
+              return (
+                <tr key={row.name} className="border-t">
+                  <td className="py-2 font-medium">{row.name}</td>
+                  <td>{formatUsd(row.price)}</td>
+                  <td>
+                    {row.q.MOCK} · {row.q.WRITING} · {row.q.SPEAKING}
+                  </td>
                   <td className={cn("text-right font-semibold tabular-nums", mm.meetsTarget ? "text-[oklch(0.55_0.15_160)]" : "text-destructive")}>
                     {(mm.margin * 100).toFixed(1)} %
                   </td>

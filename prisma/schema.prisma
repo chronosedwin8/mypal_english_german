@@ -140,18 +140,21 @@ enum AttemptStatus {
 // ============================================================================
 
 model User {
-  id             String    @id
-  name           String
-  email          String    @unique
-  emailVerified  Boolean   @default(false)
-  image          String?
+  id               String    @id
+  name             String
+  email            String    @unique
+  emailVerified    Boolean   @default(false)
+  image            String?
   /// STUDENT | ADMIN (string para que Better Auth lo escriba sin enums)
-  role           String    @default("STUDENT")
+  /// STUDENT | SUPPORT (solo lectura del admin) | ADMIN
+  role             String    @default("STUDENT")
+  /// segundo factor (TOTP) activo; obligatorio para administradores en produccion
+  twoFactorEnabled Boolean?  @default(false)
   /// minusculas y, en gmail, sin puntos ni +etiqueta: evita pruebas gratis repetidas
-  emailCanonical String?
-  bannedAt       DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  emailCanonical   String?
+  bannedAt         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   sessions           Session[]
   accounts           Account[]
@@ -171,6 +174,7 @@ model User {
   studyPlans         StudyPlan[]
   examEntitlements   ExamEntitlement[]
   orgMembers         OrgMember[]
+  twoFactors         TwoFactor[]
 
   @@index([emailCanonical])
   @@map("user")
@@ -1384,4 +1388,20 @@ model InstitutionLead {
   createdAt   DateTime @default(now())
 
   @@index([status, createdAt])
+}
+
+/// Segundo factor de autenticacion (TOTP y codigos de respaldo) de Better Auth.
+model TwoFactor {
+  id                      String    @id
+  secret                  String
+  backupCodes             String
+  userId                  String
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verified                Boolean?  @default(true)
+  failedVerificationCount Int?      @default(0)
+  lockedUntil             DateTime?
+
+  @@index([secret])
+  @@index([userId])
+  @@map("twoFactor")
 }

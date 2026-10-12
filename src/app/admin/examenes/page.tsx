@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { ItemSetStatus } from "@/generated/prisma/client";
 import { cn } from "@/lib/utils";
 import { examBankOverview } from "@/server/admin/exams";
-import { requireAdmin } from "@/server/auth/dal";
+import { requireStaff } from "@/server/auth/dal";
 
 import { buildForm, enqueueGeneration } from "./actions";
 
@@ -35,7 +35,7 @@ export default function ExamsAdminPage(props: PageProps<"/admin/examenes">) {
 }
 
 async function Bank({ searchParams }: { searchParams: PageProps<"/admin/examenes">["searchParams"] }) {
-  await requireAdmin();
+  await requireStaff();
   const sp = await searchParams;
   const estado = typeof sp.estado === "string" && STATUSES.some((s) => s.value === sp.estado) ? (sp.estado as ItemSetStatus | "ALL") : "REVIEW";
   const aviso = typeof sp.aviso === "string" ? sp.aviso : null;

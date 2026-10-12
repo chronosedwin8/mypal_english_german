@@ -5,7 +5,7 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
-import { captcha } from "better-auth/plugins";
+import { captcha, twoFactor } from "better-auth/plugins";
 
 import { canonicalEmail } from "@/lib/email-canonical";
 import { db } from "@/server/db";
@@ -46,6 +46,7 @@ export const auth = betterAuth({
   user: {
     additionalFields: {
       role: { type: "string", input: false, required: false, defaultValue: "STUDENT" },
+      twoFactorEnabled: { type: "boolean", input: false, required: false, defaultValue: false },
       emailCanonical: { type: "string", input: false, required: false },
     },
   },
@@ -73,6 +74,12 @@ export const auth = betterAuth({
     },
     session: {
       create: {
+        // Cuenta suspendida: no se crea la sesion.
+        before: async (session) => {
+          const u = await db.user.findUnique({ where: { id: session.userId }, select: { bannedAt: true } });
+          if (u?.bannedAt) return false;
+          return { data: session };
+        },
         after: async (session, ctx) => {
           // Los tests de nivel hechos sin cuenta pasan a la cuenta al ingresar.
           const headers = ctx?.headers ?? ctx?.request?.headers;
@@ -103,6 +110,8 @@ export const auth = betterAuth({
       secretKey: process.env.TURNSTILE_SECRET_KEY ?? "",
       endpoints: ["/sign-up/email", "/request-password-reset"],
     }),
+    // Segundo factor (TOTP + codigos de respaldo); obligatorio para administradores.
+    twoFactor({ issuer: "MyPAL" }),
     // Debe ir al final: permite fijar cookies desde Server Actions.
     nextCookies(),
   ],

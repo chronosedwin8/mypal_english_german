@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { Suspense } from "react";
 
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -6,11 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
-import { requireAdmin } from "@/server/auth/dal";
+import { requireStaff } from "@/server/auth/dal";
 import { db } from "@/server/db";
+import { quotaSummary } from "@/server/exams/entitlements";
 import { checkLedgerInvariants, getBalance } from "@/server/ledger/wallet";
 
-import { grantMinutes } from "../../actions";
+import { grantExamQuotaAction, grantMinutes, setRoleAction, setSuspendedAction } from "../../actions";
 
 export const metadata = { title: "Admin · Usuario" };
 
@@ -29,14 +31,21 @@ async function UserDetail({
   params: Promise<{ id: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireAdmin();
+  await requireStaff();
   const { id } = await params;
-  const ok = (await searchParams).ok;
+  const sp = await searchParams;
+  const ok = sp.ok;
+  const aviso = typeof sp.aviso === "string" ? sp.aviso : null;
   const user = await db.user.findUnique({
     where: { id },
     include: { subscriptions: { orderBy: { createdAt: "desc" }, take: 3 }, profiles: true, trialClaim: true },
   });
   if (!user) notFound();
+  const [quota, memberships, attempts] = await Promise.all([
+    quotaSummary(id),
+    db.orgMember.findMany({ where: { userId: id }, include: { org: { select: { name: true } } } }),
+    db.examAttempt.groupBy({ by: ["mode", "status"], where: { userId: id }, _count: true }),
+  ]);
   const [balance, ledger, sessions, invariants] = await Promise.all([
     getBalance(id),
     db.ledgerEntry.findMany({ where: { userId: id }, orderBy: { id: "desc" }, take: 30 }),
@@ -50,7 +59,81 @@ async function UserDetail({
         <h1 className="font-heading text-2xl font-extrabold">{user.email}</h1>
         <p className="text-muted-foreground">
           {user.name} · {user.role} · {user.emailVerified ? "verificado" : "sin verificar"} · prueba {user.trialClaim ? "usada" : "disponible"}
+          {user.twoFactorEnabled ? " · 2FA activo" : ""}
+          {user.bannedAt && <b className="text-destructive"> · SUSPENDIDA desde {user.bannedAt.toLocaleDateString("es")}</b>}
         </p>
+      </div>
+      {aviso && (
+        <Alert>
+          <AlertDescription>{aviso}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid gap-6 md:grid-cols-3">
+        <section className="rounded-2xl border bg-card p-6">
+          <h2 className="font-semibold">Exámenes</h2>
+          <p className="mt-2 text-sm">
+            Cupos disponibles: {quota.MOCK.available} simulacros · {quota.WRITING.available} Writing · {quota.SPEAKING.available} Speaking
+          </p>
+          <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
+            {attempts.map((a) => (
+              <li key={`${a.mode}-${a.status}`}>
+                {a.mode} {a.status.toLowerCase()}: {a._count}
+              </li>
+            ))}
+          </ul>
+          <form action={grantExamQuotaAction} className="mt-3 grid grid-cols-2 gap-2 text-sm">
+            <input type="hidden" name="userId" value={user.id} />
+            <select name="kind" className="h-9 rounded-lg border bg-background px-2" aria-label="Tipo de cupo">
+              <option value="MOCK">Simulacros</option>
+              <option value="WRITING">Writing</option>
+              <option value="SPEAKING">Speaking</option>
+            </select>
+            <input name="amount" type="number" min={1} defaultValue={1} className="h-9 rounded-lg border bg-background px-2" aria-label="Cantidad" />
+            <input name="days" type="number" min={1} defaultValue={30} className="h-9 rounded-lg border bg-background px-2" aria-label="Días" />
+            <input name="reason" required minLength={3} placeholder="Motivo" className="h-9 rounded-lg border bg-background px-2" />
+            <Button type="submit" size="sm" variant="outline" className="col-span-2">
+              Otorgar cupo
+            </Button>
+          </form>
+        </section>
+        <section className="rounded-2xl border bg-card p-6">
+          <h2 className="font-semibold">Instituciones</h2>
+          <ul className="mt-2 space-y-1 text-sm">
+            {memberships.map((m) => (
+              <li key={m.id}>
+                {m.org.name} · {m.role} · {m.status}
+                {m.isMinor && " · menor de edad"}
+              </li>
+            ))}
+            {!memberships.length && <li className="text-muted-foreground">Usuario individual.</li>}
+          </ul>
+        </section>
+        <section className="space-y-3 rounded-2xl border bg-card p-6">
+          <h2 className="font-semibold">Cuenta</h2>
+          <form action={setRoleAction} className="flex gap-2">
+            <input type="hidden" name="userId" value={user.id} />
+            <select name="role" defaultValue={user.role} className="h-9 flex-1 rounded-lg border bg-background px-2 text-sm" aria-label="Rol">
+              <option value="STUDENT">Estudiante</option>
+              <option value="SUPPORT">Soporte (solo lectura)</option>
+              <option value="ADMIN">Administrador</option>
+            </select>
+            <Button type="submit" size="sm" variant="outline">
+              Cambiar rol
+            </Button>
+          </form>
+          <form action={setSuspendedAction} className="space-y-2">
+            <input type="hidden" name="userId" value={user.id} />
+            <input type="hidden" name="suspend" value={user.bannedAt ? "false" : "true"} />
+            {!user.bannedAt && <input name="reason" placeholder="Motivo de la suspensión" className="h-9 w-full rounded-lg border bg-background px-2 text-sm" />}
+            <Button type="submit" size="sm" variant={user.bannedAt ? "outline" : "destructive"} className="w-full">
+              {user.bannedAt ? "Reactivar cuenta" : "Suspender cuenta"}
+            </Button>
+          </form>
+          <Link href={`/admin/usuarios/${user.id}/ver`} className="block text-sm font-semibold text-primary hover:underline">
+            Ver como este usuario (solo lectura)
+          </Link>
+        </section>
       </div>
       {ok && (
         <Alert>

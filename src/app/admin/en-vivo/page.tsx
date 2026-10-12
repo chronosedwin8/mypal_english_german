@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import { liveOverview } from "@/server/admin/metrics";
-import { requireAdmin } from "@/server/auth/dal";
+import { requireStaff } from "@/server/auth/dal";
+import { db } from "@/server/db";
 
 import { forceEnd } from "../actions";
 
@@ -20,8 +21,11 @@ export default function LivePage() {
 }
 
 async function Live() {
-  await requireAdmin();
+  await requireStaff();
   const { sessions, slots, queue } = await liveOverview();
+  const minors = new Set(
+    (await db.orgMember.findMany({ where: { userId: { in: sessions.map((s) => s.userId) }, status: "ACTIVE", isMinor: true }, select: { userId: true } })).map((m) => m.userId),
+  );
   return (
     <div className="space-y-8">
       <AutoRefresh everyMs={5000} />
@@ -69,6 +73,7 @@ async function Live() {
                     <td className="p-3">
                       {s.user.email}
                       {s.isTrial && <span className="ml-2 rounded bg-sun/40 px-1.5 text-[10px] font-bold">PRUEBA</span>}
+                      {minors.has(s.userId) && <span className="ml-2 rounded bg-rose-100 px-1.5 text-[10px] font-bold text-rose-900">MENOR</span>}
                     </td>
                     <td>{s.status}</td>
                     <td>{s.language}</td>

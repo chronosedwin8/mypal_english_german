@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
-import { requireAdmin } from "@/server/auth/dal";
+import { requireStaff } from "@/server/auth/dal";
 import { CONFIG_SCHEMA, getConfig, type ConfigKey } from "@/server/config";
 
 import { updateConfig } from "../actions";
@@ -61,6 +61,7 @@ const LABELS: Partial<Record<ConfigKey, string>> = {
   "exam.speaking.maxPrepSeconds": "Speaking: preparación máxima en práctica (segundos)",
   "exam.freePractices": "Prácticas de examen gratis sin plan",
   "exam.adhoc.dailyPerUser": "Generaciones al momento por usuario y día",
+  "exam.reportsToReview": "Reportes de alumnos que mandan una pregunta a revisión",
   "exam.writing.task2Weight": "Peso de Writing Tarea 2 frente a Tarea 1",
   "exam.testdaf.cutoffs": "Cortes estimados TestDaF → TDN (JSON)",
   "exam.audioUrlSeconds": "Validez de las URLs de audio (segundos)",
@@ -79,7 +80,7 @@ export default function ConfigPage(props: PageProps<"/admin/configuracion">) {
 }
 
 async function Config({ searchParams }: { searchParams: PageProps<"/admin/configuracion">["searchParams"] }) {
-  await requireAdmin();
+  await requireStaff();
   const { error } = await searchParams;
   const config = await getConfig({ fresh: true });
   const keys = Object.keys(CONFIG_SCHEMA) as ConfigKey[];

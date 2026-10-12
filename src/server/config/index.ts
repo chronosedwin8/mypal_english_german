@@ -88,6 +88,8 @@ export const CONFIG_SCHEMA = {
   "exam.freePractices": z.number().int().min(0).max(50).default(1),
   /** Generacion al momento en practica dirigida (por usuario y dia). */
   "exam.adhoc.dailyPerUser": z.number().int().min(0).max(50).default(3),
+  /** Reportes de personas distintas que mandan un bloque a revision humana. */
+  "exam.reportsToReview": z.number().int().min(1).max(50).default(3),
   "exam.writing.task2Weight": z.number().min(1).max(4).default(2),
   /** Cortes ESTIMADOS de TestDaF (escala 0–20 → TDN). */
   "exam.testdaf.cutoffs": z

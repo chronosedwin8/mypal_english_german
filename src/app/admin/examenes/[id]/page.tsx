@@ -8,7 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { renderChartSvg, renderMapSvg, type ChartData, type MapData } from "@/lib/render/svg";
 import { examBlockDetail } from "@/server/admin/exams";
-import { requireAdmin } from "@/server/auth/dal";
+import { requireStaff } from "@/server/auth/dal";
 import type { JudgeVerdict, QaRound } from "@/server/exams/bank/pipeline";
 import type { PublicGroup, QuestionKey } from "@/server/exams/bank/schemas";
 
@@ -26,7 +26,7 @@ export default function BlockPage(props: PageProps<"/admin/examenes/[id]">) {
 
 /* eslint-disable @typescript-eslint/no-explicit-any -- el contenido es JSON validado al generarse */
 async function Block({ params }: { params: PageProps<"/admin/examenes/[id]">["params"] }) {
-  await requireAdmin();
+  await requireStaff();
   const { id } = await params;
   const detail = await examBlockDetail(id);
   if (!detail) notFound();

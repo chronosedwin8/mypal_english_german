@@ -98,7 +98,7 @@ async function Exams({ searchParams }: { searchParams: PageProps<"/app/examenes"
   );
 }
 
-async function PracticeAccess({ user }: { user: { id: string; role: "STUDENT" | "ADMIN" } }) {
+async function PracticeAccess({ user }: { user: { id: string; role: "STUDENT" | "SUPPORT" | "ADMIN" } }) {
   const access = await can(user, "exam.practice");
   if (access.allowed) return null;
   return (
@@ -151,7 +151,7 @@ async function AssignmentsBlock({ userId }: { userId: string }) {
   );
 }
 
-async function MockCard({ user, exam }: { user: { id: string; role: "STUDENT" | "ADMIN" }; exam: ExamCode }) {
+async function MockCard({ user, exam }: { user: { id: string; role: "STUDENT" | "SUPPORT" | "ADMIN" }; exam: ExamCode }) {
   const [access, quota, open, last] = await Promise.all([
     can(user, "exam.mock"),
     quotaSummary(user.id),
@@ -198,7 +198,7 @@ async function MockCard({ user, exam }: { user: { id: string; role: "STUDENT" | 
   );
 }
 
-async function SpeakingCard({ user, exam }: { user: { id: string; role: "STUDENT" | "ADMIN" }; exam: ExamCode }) {
+async function SpeakingCard({ user, exam }: { user: { id: string; role: "STUDENT" | "SUPPORT" | "ADMIN" }; exam: ExamCode }) {
   const [access, quota, recentAll] = await Promise.all([
     can(user, "exam.speaking"),
     quotaSummary(user.id),
@@ -273,7 +273,7 @@ async function SpeakingCard({ user, exam }: { user: { id: string; role: "STUDENT
   );
 }
 
-async function WritingCard({ user, exam }: { user: { id: string; role: "STUDENT" | "ADMIN" }; exam: ExamCode }) {
+async function WritingCard({ user, exam }: { user: { id: string; role: "STUDENT" | "SUPPORT" | "ADMIN" }; exam: ExamCode }) {
   const [access, quota, writingAll] = await Promise.all([
     can(user, "exam.writing"),
     quotaSummary(user.id),
@@ -382,7 +382,7 @@ function StartButton(props: {
   );
 }
 
-async function IeltsPractice({ user, exam }: { user: { id: string; role: "STUDENT" | "ADMIN" }; exam: ExamCode }) {
+async function IeltsPractice({ user, exam }: { user: { id: string; role: "STUDENT" | "SUPPORT" | "ADMIN" }; exam: ExamCode }) {
   const { mastery, recent, available } = await practiceOverview(user.id, exam);
   const spec = EXAMS[exam];
   const has = (section: string, part?: number) => available.some((a) => a.section === section && (part === undefined || a.part === part) && a._count > 0);

@@ -14,6 +14,7 @@ import { requireUser } from "@/server/auth/dal";
 import { PracticeError, loadPracticeResult } from "@/server/exams/practice";
 
 import { startPracticeAction } from "../../actions";
+import { ReportQuestion } from "./report-question";
 
 export const metadata = { title: "Resultado de la práctica" };
 
@@ -196,6 +197,7 @@ async function Result({ params }: { params: PageProps<"/app/examenes/resultado/[
                         {key.answers[0] !== "NOT GIVEN" && (
                           <p className="rounded-lg bg-muted/50 px-3 py-2 italic">“{key.evidence}”</p>
                         )}
+                        <ReportQuestion attemptId={attempt.id} itemSetId={b.id} questionNumber={q.number} />
                       </div>
                     </div>
                   </li>

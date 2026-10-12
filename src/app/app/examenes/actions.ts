@@ -5,11 +5,13 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { EXAMS, EXAM_CODES } from "@/content/exams";
+import { REPORT_REASONS, type ReportReason } from "@/lib/exams/report-reasons";
 import { requireUser } from "@/server/auth/dal";
 import { db } from "@/server/db";
 import { QuotaError } from "@/server/exams/entitlements";
 import { MOCK_STAGES, MockError, mockIdOf, skipMockSpeaking, startMock, startMockStage, submitMockWriting, syncMock } from "@/server/exams/mock";
 import { PracticeError, audioUrl, recordTabSwitch, saveAnswer, startPractice, submitPractice } from "@/server/exams/practice";
+import { ReportError, reportQuestion } from "@/server/exams/reports";
 import { SpeakingError, startSpeaking, type SpeakingPart } from "@/server/exams/speaking";
 import { WritingError, saveWritingDraft, startWriting, submitWriting } from "@/server/exams/writing";
 import { assignmentForStudent } from "@/server/org/teaching";
@@ -270,4 +272,25 @@ export async function startAssignmentAction(formData: FormData) {
     throw err;
   }
   redirect(url);
+}
+
+const ReportSchema = z.object({
+  attemptId: z.string().min(1),
+  itemSetId: z.string().min(1),
+  questionNumber: z.number().int().min(1).max(200),
+  reason: z.enum(Object.keys(REPORT_REASONS) as [ReportReason, ...ReportReason[]]),
+  note: z.string().trim().max(500).optional(),
+});
+
+export async function reportQuestionAction(input: z.input<typeof ReportSchema>): Promise<Result> {
+  const user = await requireUser("/app/examenes");
+  const parsed = ReportSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: "Revisa el motivo del reporte." };
+  try {
+    await reportQuestion(user.id, parsed.data);
+    return { ok: true };
+  } catch (err) {
+    if (err instanceof ReportError) return { ok: false, error: err.message };
+    throw err;
+  }
 }

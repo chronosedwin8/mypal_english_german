@@ -76,6 +76,10 @@ export async function can(user: Pick<CurrentUser, "id" | "role">, resource: Reso
     }
   }
 
+  // Excepcion que permite (con motivo y vencimiento): da acceso al recurso, pero los cupos
+  // de Writing, Speaking y simulacros se siguen exigiendo.
+  if (rule?.allowed && resource !== "exam.writing" && resource !== "exam.speaking" && resource !== "exam.mock") return { allowed: true, unlimited: false };
+
   switch (resource) {
     case "exam.practice": {
       // Practica autocalificada: costo casi cero. Ilimitada con cualquier plan o cupo de

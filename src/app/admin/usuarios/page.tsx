@@ -3,7 +3,7 @@ import { Suspense } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { requireAdmin } from "@/server/auth/dal";
+import { requireStaff } from "@/server/auth/dal";
 import { db } from "@/server/db";
 
 export const metadata = { title: "Admin · Usuarios" };
@@ -17,7 +17,7 @@ export default function UsersPage({ searchParams }: PageProps<"/admin/usuarios">
 }
 
 async function Users({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  await requireAdmin();
+  await requireStaff();
   const q = typeof (await searchParams).q === "string" ? ((await searchParams).q as string).trim() : "";
   const users = await db.user.findMany({
     where: q ? { OR: [{ email: { contains: q, mode: "insensitive" } }, { name: { contains: q, mode: "insensitive" } }] } : {},

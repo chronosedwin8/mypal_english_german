@@ -4,7 +4,7 @@ import { Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { EXAMS, EXAM_CODES } from "@/content/exams";
-import { requireAdmin } from "@/server/auth/dal";
+import { requireStaff } from "@/server/auth/dal";
 import { db } from "@/server/db";
 
 import { createOrgAction, updateLeadAction } from "./actions";
@@ -23,7 +23,7 @@ export default function AdminInstitutions(props: PageProps<"/admin/instituciones
 }
 
 async function Institutions({ searchParams }: { searchParams: PageProps<"/admin/instituciones">["searchParams"] }) {
-  await requireAdmin();
+  await requireStaff();
   const sp = await searchParams;
   const aviso = typeof sp.aviso === "string" ? sp.aviso : null;
   const [orgs, leads, flags] = await Promise.all([
