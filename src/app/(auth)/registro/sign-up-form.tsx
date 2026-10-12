@@ -12,13 +12,16 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth-client";
-import { authErrorMessage } from "@/lib/auth-errors";
+import { authErrorMessage, safeNext } from "@/lib/auth-errors";
 import { planById } from "@/lib/pricing/catalog";
 
 export function SignUpForm() {
   const router = useRouter();
   const params = useSearchParams();
   const plan = planById(params.get("plan") ?? "");
+  // Invitacion de una institucion: vuelve a /unirse/<codigo> despues de verificar el correo.
+  const next = params.get("next");
+  const viaInvitation = next ? safeNext(next).startsWith("/unirse/") : false;
   const [token, setToken] = useState<string | null>(null);
   const [accepted, setAccepted] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,10 +35,11 @@ export function SignUpForm() {
     const name = String(form.get("name") ?? "").trim();
     const email = String(form.get("email") ?? "").trim();
     const password = String(form.get("password") ?? "");
-    if (!accepted) return setError("Debes aceptar los términos y confirmar que eres mayor de edad.");
+    if (!accepted)
+      return setError(viaInvitation ? "Debes aceptar los términos para unirte a tu institución." : "Debes aceptar los términos y confirmar que eres mayor de edad.");
     if (!token) return setError("Completa la verificación de seguridad.");
     setPending(true);
-    const callbackURL = plan ? `/app/planes?plan=${plan.id}` : "/app";
+    const callbackURL = viaInvitation ? safeNext(next) : plan ? `/app/planes?plan=${plan.id}` : "/app";
     const { error: err } = await authClient.signUp.email(
       { name, email, password, callbackURL },
       { headers: { "x-captcha-response": token } },
@@ -78,7 +82,7 @@ export function SignUpForm() {
       <label className="flex items-start gap-3 text-sm">
         <Checkbox checked={accepted} onCheckedChange={(v) => setAccepted(Boolean(v))} className="mt-0.5" />
         <span>
-          Soy mayor de 18 años y acepto los{" "}
+          {viaInvitation ? "Me uno por invitación de mi institución y acepto los" : "Soy mayor de 18 años y acepto los"}{" "}
           <Link href="/legal/terminos" className="font-medium text-primary underline-offset-4 hover:underline">
             términos
           </Link>{" "}
@@ -100,7 +104,7 @@ export function SignUpForm() {
       </Button>
       <p className="text-center text-sm text-muted-foreground">
         ¿Ya tienes cuenta?{" "}
-        <Link href="/ingresar" className="font-semibold text-primary hover:underline">
+        <Link href={viaInvitation ? `/ingresar?next=${encodeURIComponent(safeNext(next))}` : "/ingresar"} className="font-semibold text-primary hover:underline">
           Ingresa
         </Link>
       </p>

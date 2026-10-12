@@ -15,6 +15,7 @@ import type { CurrentUser } from "@/server/auth/dal";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { enqueue } from "@/server/jobs/queue";
+import { completeAssignmentFor } from "@/server/org/teaching";
 import { markPlanProgress } from "@/server/study/plan";
 
 import { consumeQuota, releaseQuota, reserveQuota } from "./entitlements";
@@ -102,7 +103,7 @@ export async function createMockWriting(input: { userId: string; exam: ExamCode;
 
 /* ───────────────────────── empezar y guardar ───────────────────────── */
 
-export async function startWriting(user: Pick<CurrentUser, "id" | "role">, input: { exam: ExamCode; task: number; timed: boolean }) {
+export async function startWriting(user: Pick<CurrentUser, "id" | "role">, input: { exam: ExamCode; task: number; timed: boolean; assignmentId?: string }) {
   const access = await can(user, "exam.writing");
   if (!access.allowed) throw new WritingError("NO_ACCESS", access.reason ?? "No tienes correcciones de Writing disponibles.");
   const [candidates, seen, forms] = await Promise.all([
@@ -122,7 +123,7 @@ export async function startWriting(user: Pick<CurrentUser, "id" | "role">, input
 
   return db.$transaction(async (tx) => {
     const a = await tx.examAttempt.create({
-      data: { userId: user.id, exam: input.exam, mode: "WRITING", config: config as unknown as Prisma.InputJsonValue },
+      data: { userId: user.id, exam: input.exam, mode: "WRITING", config: config as unknown as Prisma.InputJsonValue, assignmentId: input.assignmentId ?? null },
     });
     await tx.examSectionAttempt.create({
       data: {
@@ -199,6 +200,8 @@ export async function submitWriting(attemptId: string, user: Pick<CurrentUser, "
   await db.examAttempt.update({ where: { id: attemptId }, data: { status: "SCORING" } });
   await db.examSectionAttempt.updateMany({ where: { attemptId }, data: { submittedAt: new Date() } });
   await enqueue("writing.grade", { submissionId: submission.id }, { dedupeKey: `writing:${submission.id}` });
+  // Entregar cumple la tarea del docente (la nota llega despues).
+  await completeAssignmentFor(attemptId).catch(() => undefined);
   return submission;
 }
 
@@ -362,6 +365,7 @@ export async function loadWriting(attemptId: string, userId: string) {
     deadlineAt: attempt.sections[0]?.deadlineAt?.toISOString() ?? null,
     serverNow: new Date().toISOString(),
     draft: String((draft?.answer as { value?: string } | undefined)?.value ?? ""),
+    teacherReview: submission ? await db.teacherReview.findFirst({ where: { submissionId: submission.id }, orderBy: { createdAt: "desc" } }) : null,
     submission: submission
       ? {
           status: submission.status,

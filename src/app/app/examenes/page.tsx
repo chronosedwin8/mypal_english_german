@@ -14,10 +14,11 @@ import { requireUser } from "@/server/auth/dal";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { quotaSummary } from "@/server/exams/entitlements";
+import { assignmentDefaults, studentAssignments } from "@/server/org/teaching";
 import { BANK_EXAMS } from "@/server/exams/bank/targets";
 import { practiceOverview, type PracticeConfig, type PracticeScores } from "@/server/exams/practice";
 
-import { startMockAction, startPracticeAction, startSpeakingAction, startWritingAction } from "./actions";
+import { startAssignmentAction, startMockAction, startPracticeAction, startSpeakingAction, startWritingAction } from "./actions";
 
 export const metadata = { title: "Exámenes" };
 
@@ -64,6 +65,8 @@ async function Exams({ searchParams }: { searchParams: PageProps<"/app/examenes"
         ))}
       </div>
 
+      <AssignmentsBlock userId={user.id} />
+
       {aviso && <p className="rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">{aviso}</p>}
 
       <div className="rounded-3xl border bg-card p-6">
@@ -108,6 +111,43 @@ async function PracticeAccess({ user }: { user: { id: string; role: "STUDENT" | 
         Ver planes
       </Link>
     </div>
+  );
+}
+
+async function AssignmentsBlock({ userId }: { userId: string }) {
+  const results = await studentAssignments(userId);
+  if (!results.length) return null;
+  const { now } = assignmentDefaults();
+  return (
+    <section className="rounded-3xl border border-primary/30 bg-primary/5 p-5">
+      <h2 className="font-heading text-lg font-bold">Tareas de tu docente</h2>
+      <ul className="mt-3 space-y-2">
+        {results.map((r) => {
+          const late = r.status !== "DONE" && r.assignment.closesAt < now;
+          return (
+            <li key={r.assignmentId} className="flex flex-wrap items-center gap-3 rounded-2xl bg-card px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <p className="font-medium">{r.assignment.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {r.assignment.group.name} · cierra {r.assignment.closesAt.toLocaleString("es", { dateStyle: "medium", timeStyle: "short" })}
+                  {late && " · vencida"}
+                </p>
+              </div>
+              {r.status === "DONE" ? (
+                <span className="text-sm font-semibold text-emerald-600">Entregada</span>
+              ) : (
+                <form action={startAssignmentAction}>
+                  <input type="hidden" name="assignmentId" value={r.assignmentId} />
+                  <Button type="submit" size="sm">
+                    Empezar
+                  </Button>
+                </form>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 

@@ -12,6 +12,7 @@ import { MOCK_STAGES, MockError, mockIdOf, skipMockSpeaking, startMock, startMoc
 import { PracticeError, audioUrl, recordTabSwitch, saveAnswer, startPractice, submitPractice } from "@/server/exams/practice";
 import { SpeakingError, startSpeaking, type SpeakingPart } from "@/server/exams/speaking";
 import { WritingError, saveWritingDraft, startWriting, submitWriting } from "@/server/exams/writing";
+import { assignmentForStudent } from "@/server/org/teaching";
 import { savePlan, setItemStatus } from "@/server/study/plan";
 
 const StartSchema = z.object({
@@ -237,4 +238,36 @@ export async function officialResultAction(formData: FormData) {
     },
   });
   redirect("/app/examenes/progreso?aviso=" + encodeURIComponent("¡Gracias! Usamos tu nota oficial para afinar el simulador."));
+}
+
+/* ───────────── Tareas del docente ───────────── */
+
+export async function startAssignmentAction(formData: FormData) {
+  const user = await requireUser("/app/examenes");
+  const assignmentId = z.string().min(1).parse(formData.get("assignmentId"));
+  let url = "/app/examenes";
+  try {
+    const a = await assignmentForStudent(assignmentId, user.id);
+    const cfg = a.config as { exam: string; mode?: "DRILL" | "PART" | "SECTION"; section?: "LISTENING" | "READING"; taskType?: string | null; part?: number | null; task?: number; parts?: number[] | "all" };
+    const exam = cfg.exam as never;
+    if (a.kind === "PRACTICE") {
+      const r = await startPractice(user, { exam, mode: cfg.mode ?? "PART", section: cfg.section ?? "READING", part: cfg.part ?? (cfg.mode === "PART" ? 1 : null), taskType: cfg.taskType ?? null, assignmentId });
+      url = `/app/examenes/practica/${r.attemptId}`;
+    } else if (a.kind === "WRITING") {
+      const r = await startWriting(user, { exam, task: cfg.task ?? 1, timed: true, assignmentId });
+      url = `/app/examenes/writing/${r.attemptId}`;
+    } else if (a.kind === "SPEAKING") {
+      const all = EXAMS[cfg.exam as keyof typeof EXAMS].sections.find((s) => s.section === "SPEAKING")!.parts.map((p) => p.part);
+      const r = await startSpeaking(user, { exam, parts: cfg.parts === "all" || !cfg.parts ? all : cfg.parts, assignmentId });
+      url = `/app/examenes/speaking/${r.attemptId}`;
+    } else {
+      const r = await startMock(user, exam, { formId: a.formId ?? undefined, assignmentId });
+      url = `/app/examenes/simulacro/${r.mockId}`;
+    }
+  } catch (err) {
+    const message = err instanceof QuotaError ? "No te quedan cupos para esta tarea. Avísale a tu docente." : err instanceof Error && "code" in err ? err.message : null;
+    if (message) redirect(`/app/examenes?aviso=${encodeURIComponent(message)}`);
+    throw err;
+  }
+  redirect(url);
 }

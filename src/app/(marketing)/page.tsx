@@ -109,6 +109,28 @@ export default function LandingPage() {
 
       <ExamsSection />
 
+      {/* Instituciones */}
+      <section className="px-4 pb-8">
+        <div className="mx-auto grid max-w-6xl items-center gap-8 rounded-[2rem] border bg-card p-8 shadow-sm md:grid-cols-[1.4fr_1fr] md:p-12">
+          <div>
+            <p className="font-semibold text-primary">Para colegios, universidades y empresas</p>
+            <h2 className="mt-2 font-heading text-3xl font-extrabold tracking-tight">Lleva MyPAL a tu institución</h2>
+            <p className="mt-3 text-muted-foreground">
+              Panel docente con semáforo por estudiante, simulacros institucionales, revisión de Writing y Speaking, estadísticas por grupo y tutor con avatar
+              en el aula, también para estudiantes desde 15 años. Licencias desde $10 por estudiante al mes.
+            </p>
+          </div>
+          <div className="flex flex-col gap-3 md:items-end">
+            <Link href="/instituciones#demo" className={cn(buttonVariants(), "h-12 rounded-full px-7 text-base")}>
+              Solicita una demo <ArrowRightIcon />
+            </Link>
+            <Link href="/instituciones" className="text-sm font-semibold text-primary hover:underline">
+              Ver cómo funciona
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Como funciona */}
       <section id="como-funciona" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-24">
         <div className="mx-auto max-w-2xl text-center">

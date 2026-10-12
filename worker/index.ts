@@ -12,6 +12,8 @@ import { db } from "@/server/db";
 import { planBankGaps } from "@/server/exams/bank/planner";
 import { syncOpenMocks } from "@/server/exams/mock";
 import { closeExpiredPractice } from "@/server/exams/practice";
+import { maintainOrgMembers } from "@/server/org";
+import { snapshotGroups } from "@/server/org/teaching";
 import { replanAll } from "@/server/study/plan";
 import { processJobs } from "@/server/jobs/handlers";
 import { recoverStaleJobs } from "@/server/jobs/queue";
@@ -45,6 +47,9 @@ const loops: Loop[] = [
   { name: "exam-expired", everyMs: 15_000, run: () => closeExpiredPractice() },
   { name: "exam-mocks", everyMs: 20_000, run: () => syncOpenMocks() },
   { name: "study-replan", everyMs: 60 * 60_000, run: () => replanAll() },
+  /** Instituciones: cupos del mes de cada licencia, cuentas que cumplen 18 y resumen de grupos. */
+  { name: "org-members", everyMs: 6 * 60 * 60_000, run: () => maintainOrgMembers() },
+  { name: "org-snapshots", everyMs: 12 * 60 * 60_000, run: () => snapshotGroups() },
   { name: "exam-stale-jobs", everyMs: 5 * 60_000, run: () => recoverStaleJobs(20) },
   {
     name: "exam-bank",

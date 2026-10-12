@@ -58,6 +58,27 @@ export default function PrivacyPage() {
         la tutora está instruida para no solicitar información personal.
       </p>
 
+      <h2>Instituciones y estudiantes de 15 a 17 años</h2>
+      <p>
+        Los colegios, universidades y empresas pueden inscribir a sus estudiantes en MyPAL. Los estudiantes de 15 a 17 años solo
+        se registran a través de su institución, que declara tener la autorización previa, expresa e informada de sus
+        representantes legales (Ley 1581 de 2012 y Decreto 1377 de 2013) y supervisa su uso en el aula. Sus datos se tratan
+        solo en su interés superior: nunca para marketing ni para entrenar modelos de inteligencia artificial.
+      </p>
+      <p>
+        La institución ve el avance, los resultados, los textos y las grabaciones de sus estudiantes. Las grabaciones de
+        Speaking se guardan el tiempo que defina la institución y solo las ven el estudiante y sus docentes. Al retirarse de la
+        institución, la cuenta y su historial siguen siendo del estudiante, y la institución deja de verlos. Al cumplir 18 años,
+        la cuenta pasa a ser de adulto.
+      </p>
+
+      <h2>Exámenes con inteligencia artificial</h2>
+      <p>
+        Las preguntas de práctica se generan con inteligencia artificial y se revisan antes de publicarse. Los textos y las
+        grabaciones que envías para calificar se procesan con proveedores de inteligencia artificial y de voz en niveles
+        pagos que no usan tus datos para entrenar sus modelos. Las notas son estimaciones, no resultados oficiales.
+      </p>
+
       <h2>Conservación</h2>
       <p>
         Conservamos tus datos mientras tengas una cuenta activa y el tiempo necesario para cumplir obligaciones legales y

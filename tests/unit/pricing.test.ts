@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { EXAM_PRODUCTS, PLANS, TOPUPS, TRIAL_SECONDS, subscriptionKind } from "@/lib/pricing/catalog";
+import { EXAM_PRODUCTS, ORG_LICENSES, PLANS, TOPUPS, TRIAL_SECONDS, subscriptionKind } from "@/lib/pricing/catalog";
 import { DEFAULT_COSTS, cheapestTavusTier, examProductMargin, maxMinutesForPrice, minPriceForSeconds, worstCaseMargin } from "@/lib/pricing/margin";
 
 describe("margen garantizado (peor caso: 100 % de los minutos usados)", () => {
@@ -83,5 +83,17 @@ describe("productos de examen", () => {
     expect(m.platformUsdCents).toBe(0);
     expect(m.examUsdCents).toBe(410);
     expect(m.margin).toBeCloseTo(0.647, 3);
+  });
+});
+
+describe("licencias para instituciones", () => {
+  it.each(ORG_LICENSES.map((l) => [l.id, l] as const))("%s cumple >= 60 %% por estudiante al mes", (_id, l) => {
+    const m = examProductMargin({ priceUsdCents: l.priceUsdCents, quotas: l.examQuotas, addon: false });
+    expect(m.margin).toBeGreaterThanOrEqual(0.6);
+  });
+  it("coinciden con el plan: 64,0 % y 63,4 %", () => {
+    const [e, i] = ORG_LICENSES.map((l) => examProductMargin({ priceUsdCents: l.priceUsdCents, quotas: l.examQuotas, addon: false }).margin);
+    expect(e).toBeCloseTo(0.64, 3);
+    expect(i).toBeCloseTo(0.634, 3);
   });
 });

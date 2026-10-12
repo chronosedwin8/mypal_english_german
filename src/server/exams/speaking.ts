@@ -20,6 +20,7 @@ import type { CurrentUser } from "@/server/auth/dal";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { enqueue } from "@/server/jobs/queue";
+import { completeAssignmentFor } from "@/server/org/teaching";
 import { markPlanProgress } from "@/server/study/plan";
 import { speechToText, textToSpeech } from "@/server/speech/elevenlabs";
 import { silenceMp3 } from "@/server/speech/mp3";
@@ -88,7 +89,7 @@ async function pickBlock(userId: string, exam: ExamCode, part: number) {
 
 export async function startSpeaking(
   user: Pick<CurrentUser, "id" | "role">,
-  input: { exam: ExamCode; parts: SpeakingPart[]; mock?: { mockId: string; p1?: string; p2?: string; byPart?: Record<string, string> } },
+  input: { exam: ExamCode; parts: SpeakingPart[]; mock?: { mockId: string; p1?: string; p2?: string; byPart?: Record<string, string> }; assignmentId?: string },
 ) {
   const access = input.mock ? { allowed: true, unlimited: true, reason: undefined } : await can(user, "exam.speaking");
   if (!access.allowed) throw new SpeakingError("NO_ACCESS", access.reason ?? "No tienes partes de Speaking disponibles.");
@@ -121,7 +122,7 @@ export async function startSpeaking(
 
   const { attemptId, submissions } = await db.$transaction(async (tx) => {
     const a = await tx.examAttempt.create({
-      data: { userId: user.id, exam: input.exam, mode: "SPEAKING", config: config as unknown as Prisma.InputJsonValue },
+      data: { userId: user.id, exam: input.exam, mode: "SPEAKING", config: config as unknown as Prisma.InputJsonValue, assignmentId: input.assignmentId ?? null },
     });
     const subs = [];
     for (const part of parts)
@@ -269,8 +270,9 @@ async function advance(attemptId: string) {
     await db.speakingSubmission.update({ where: { id: sub.id }, data: { turns: [...turns, next] as unknown as Prisma.InputJsonValue } });
     return;
   }
-  // Todas las partes respondidas: queda calificandose.
+  // Todas las partes respondidas: queda calificandose (y cumple la tarea del docente).
   await db.examAttempt.update({ where: { id: attemptId }, data: { status: "SCORING" } });
+  await completeAssignmentFor(attemptId).catch(() => undefined);
 }
 
 function transcriptOf(turns: Turn[]): string {

@@ -81,6 +81,20 @@ export default function TermsPage() {
 
       <h2>8. Contacto</h2>
       <p>Escríbenos a {SITE.supportEmail}.</p>
+      <h2>Instituciones</h2>
+      <p>
+        Las instituciones compran licencias por estudiante y por periodo. Cada estudiante activo ocupa una licencia y recibe
+        los cupos de su licencia cada mes; las cuentas de docente no ocupan licencia. La institución responde por las
+        autorizaciones de sus estudiantes menores de edad (15 a 17 años) y por su supervisión. Los estudiantes menores no hacen
+        compras propias ni reciben correos comerciales.
+      </p>
+
+      <h2>Preparación de exámenes</h2>
+      <p>
+        MyPAL es una preparación independiente para IELTS, Goethe-Zertifikat y TestDaF; no está afiliada a British Council,
+        IDP, Cambridge, el Goethe-Institut ni TestDaF. Las notas de las prácticas y los simulacros son estimaciones y no
+        sustituyen el resultado oficial del examen.
+      </p>
     </article>
   );
 }

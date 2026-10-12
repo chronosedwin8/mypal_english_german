@@ -17,6 +17,7 @@ import type { CurrentUser } from "@/server/auth/dal";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { examReportEmail, sendEmail } from "@/server/email";
+import { completeAssignmentFor } from "@/server/org/teaching";
 import { addMockImprovements, markPlanProgress } from "@/server/study/plan";
 
 import { consumeQuota, releaseQuota, reserveQuota } from "./entitlements";
@@ -66,12 +67,12 @@ async function pickForm(userId: string, exam: ExamCode) {
   );
 }
 
-export async function startMock(user: Pick<CurrentUser, "id" | "role">, exam: ExamCode): Promise<{ mockId: string }> {
+export async function startMock(user: Pick<CurrentUser, "id" | "role">, exam: ExamCode, opts: { formId?: string; assignmentId?: string } = {}): Promise<{ mockId: string }> {
   const open = await db.examAttempt.findFirst({ where: { userId: user.id, mode: "MOCK", status: { in: ["IN_PROGRESS", "SCORING"] } } });
   if (open) return { mockId: open.id };
   const access = await can(user, "exam.mock");
   if (!access.allowed) throw new MockError("NO_ACCESS", access.reason ?? "Necesitas un simulacro disponible en tu plan.");
-  let form = await pickForm(user.id, exam);
+  let form = opts.formId ? await db.examForm.findUnique({ where: { id: opts.formId } }) : await pickForm(user.id, exam);
   if (!form) {
     // Se arma una forma nueva con bloques aprobados que nadie ha usado en formas.
     const r = await assembleForm(exam);
@@ -83,7 +84,7 @@ export async function startMock(user: Pick<CurrentUser, "id" | "role">, exam: Ex
   let mock;
   try {
     mock = await db.examAttempt.create({
-      data: { userId: user.id, exam, mode: "MOCK", formId: form.id, config: config as unknown as Prisma.InputJsonValue },
+      data: { userId: user.id, exam, mode: "MOCK", formId: form.id, config: config as unknown as Prisma.InputJsonValue, assignmentId: opts.assignmentId ?? null },
     });
   } catch {
     // Carrera: otro clic ya abrio el simulacro (indice unico de un simulacro abierto).
@@ -437,6 +438,7 @@ async function finishReport(
   await releaseQuota({ userId: mock.userId, kind: "MOCK", refId: mockId });
   // El simulacro cuenta en el plan y su informe se convierte en tareas de mejora.
   await markPlanProgress(mock.userId, mock.exam, { kind: "MOCK" }).catch(() => undefined);
+  await completeAssignmentFor(mockId).catch(() => undefined);
   await addMockImprovements(mockId).catch((err) => console.error("[mock] plan de mejora", err));
 
   const url = `${process.env.APP_URL ?? "http://localhost:3000"}/app/examenes/simulacro/${mockId}`;

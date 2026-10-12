@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOutIcon, ShieldIcon, MoonIcon, SunIcon } from "lucide-react";
+import { Building2Icon, GraduationCapIcon, LogOutIcon, ShieldIcon, MoonIcon, SunIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
@@ -15,7 +15,19 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth-client";
 
-export function UserMenuClient({ name, email, isAdmin }: { name: string; email: string; isAdmin: boolean }) {
+export function UserMenuClient({
+  name,
+  email,
+  isAdmin,
+  isTeacher = false,
+  isOrgAdmin = false,
+}: {
+  name: string;
+  email: string;
+  isAdmin: boolean;
+  isTeacher?: boolean;
+  isOrgAdmin?: boolean;
+}) {
   const router = useRouter();
   const { resolvedTheme, setTheme } = useTheme();
   const initial = name.trim().charAt(0).toUpperCase() || "?";
@@ -36,6 +48,16 @@ export function UserMenuClient({ name, email, isAdmin }: { name: string; email: 
         {isAdmin && (
           <DropdownMenuItem render={<Link href="/admin" />}>
             <ShieldIcon /> Administración
+          </DropdownMenuItem>
+        )}
+        {isTeacher && (
+          <DropdownMenuItem render={<Link href="/docente" />}>
+            <GraduationCapIcon /> Panel docente
+          </DropdownMenuItem>
+        )}
+        {isOrgAdmin && (
+          <DropdownMenuItem render={<Link href="/institucion" />}>
+            <Building2Icon /> Institución
           </DropdownMenuItem>
         )}
         <DropdownMenuItem onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}>

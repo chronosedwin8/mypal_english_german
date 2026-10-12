@@ -170,6 +170,7 @@ model User {
   examAttempts       ExamAttempt[]
   studyPlans         StudyPlan[]
   examEntitlements   ExamEntitlement[]
+  orgMembers         OrgMember[]
 
   @@index([emailCanonical])
   @@map("user")
@@ -576,24 +577,24 @@ model VocabularyItem {
 
 model DiagnosticItem {
   /// codigo estable, p. ej. "en-b1-grammar-03"
-  id             String               @id
-  lang           BaseLang
-  skill          Skill
-  level          Cefr
+  id            String               @id
+  lang          BaseLang
+  skill         Skill
+  level         Cefr
   /// dificultad IRT (logits)
-  difficulty     Float
-  stem           String
-  passage        String?
+  difficulty    Float
+  stem          String
+  passage       String?
   /// texto que se convierte en audio (items de escucha)
-  audioText      String?
-  options        Json
+  audioText     String?
+  options       Json
   /// nunca se envia al navegador
-  correctIndex   Int
-  explanationEs  String?
-  isActive       Boolean              @default(true)
-  timesServed    Int                  @default(0)
-  timesCorrect   Int                  @default(0)
-  responses      DiagnosticResponse[]
+  correctIndex  Int
+  explanationEs String?
+  isActive      Boolean              @default(true)
+  timesServed   Int                  @default(0)
+  timesCorrect  Int                  @default(0)
+  responses     DiagnosticResponse[]
 
   @@index([lang, isActive, difficulty])
 }
@@ -885,25 +886,27 @@ model ExamForm {
 }
 
 model ExamAttempt {
-  id          String               @id @default(uuid(7))
-  userId      String
-  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exam        ExamCode
-  mode        ExamMode
-  formId      String?
-  form        ExamForm?            @relation(fields: [formId], references: [id])
-  status      ExamAttemptStatus    @default(IN_PROGRESS)
+  id           String               @id @default(uuid(7))
+  /// asignacion del docente que cumple este intento
+  assignmentId String?
+  userId       String
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam         ExamCode
+  mode         ExamMode
+  formId       String?
+  form         ExamForm?            @relation(fields: [formId], references: [id])
+  status       ExamAttemptStatus    @default(IN_PROGRESS)
   /// que se practica (seccion, parte, tipo de pregunta...)
-  config      Json
-  scores      Json?
-  overall     Float?
-  startedAt   DateTime             @default(now())
-  completedAt DateTime?
-  sections    ExamSectionAttempt[]
-  responses   ExamResponse[]
-  writing     WritingSubmission[]
-  speaking    SpeakingSubmission[]
-  report      ExamReport?
+  config       Json
+  scores       Json?
+  overall      Float?
+  startedAt    DateTime             @default(now())
+  completedAt  DateTime?
+  sections     ExamSectionAttempt[]
+  responses    ExamResponse[]
+  writing      WritingSubmission[]
+  speaking     SpeakingSubmission[]
+  report       ExamReport?
 
   @@unique([userId], map: "one_open_mock_per_user", where: raw("((mode = 'MOCK'::\"ExamMode\") AND (status = ANY (ARRAY['IN_PROGRESS'::\"ExamAttemptStatus\", 'SCORING'::\"ExamAttemptStatus\"])))"))
   @@index([userId, exam, startedAt(sort: Desc)])
@@ -1136,4 +1139,249 @@ model OfficialResult {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// ───────────────────────── Instituciones ─────────────────────────
+
+enum OrgType {
+  COMPANY
+  SCHOOL
+  UNIVERSITY
+}
+
+enum OrgRole {
+  ORG_ADMIN
+  TEACHER
+  STUDENT
+}
+
+/// Institucion: empresa, colegio o universidad.
+model Organization {
+  id                      String       @id @default(uuid(7))
+  /// identificador corto para enlaces
+  slug                    String       @unique
+  name                    String
+  type                    OrgType
+  taxId                   String?
+  country                 String       @default("CO")
+  enabledExams            ExamCode[]
+  /// umbrales del semaforo: { riskBandGap, inactiveDays }
+  thresholds              Json         @default("{\"riskBandGap\": 0.5, \"inactiveDays\": 7}")
+  allowsMinors            Boolean      @default(false)
+  /// fecha en que la institucion declaro tener las autorizaciones de los representantes
+  minorsDeclarationAt     DateTime?
+  avatarForMinors         Boolean      @default(false)
+  cameraAllowed           Boolean      @default(true)
+  recordingsRetentionDays Int          @default(180)
+  createdAt               DateTime     @default(now())
+  members                 OrgMember[]
+  licenses                OrgLicense[]
+  groups                  Group[]
+  invitations             Invitation[]
+}
+
+/// Persona en una institucion (el rol global User.role no cambia).
+model OrgMember {
+  id        String         @id @default(uuid(7))
+  orgId     String
+  org       Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role      OrgRole
+  /// ACTIVE | REMOVED
+  status    String         @default("ACTIVE")
+  birthDate DateTime?
+  isMinor   Boolean        @default(false)
+  /// licencia que ocupa (solo estudiantes activos)
+  licenseId String?
+  createdAt DateTime       @default(now())
+  removedAt DateTime?
+  teaching  GroupTeacher[]
+  studying  GroupStudent[]
+
+  @@unique([orgId, userId])
+  @@index([userId])
+}
+
+/// Licencias compradas por periodo (Estandar o Intensiva).
+model OrgLicense {
+  id            String       @id @default(uuid(7))
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  /// estandar | intensiva
+  kind          String
+  seats         Int
+  used          Int          @default(0)
+  priceUsdCents Int
+  periodStart   DateTime
+  periodEnd     DateTime
+  createdAt     DateTime     @default(now())
+
+  @@index([orgId, periodEnd])
+}
+
+model Group {
+  id          String         @id @default(uuid(7))
+  orgId       String
+  org         Organization   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name        String
+  exam        ExamCode
+  targetDate  DateTime?
+  /// banda o puntos objetivo del grupo
+  targetScore Float?
+  createdAt   DateTime       @default(now())
+  teachers    GroupTeacher[]
+  students    GroupStudent[]
+  assignments Assignment[]
+
+  @@index([orgId])
+}
+
+model GroupTeacher {
+  groupId  String
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  memberId String
+  member   OrgMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, memberId])
+}
+
+model GroupStudent {
+  groupId  String
+  group    Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  memberId String
+  member   OrgMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  addedAt  DateTime  @default(now())
+
+  @@id([groupId, memberId])
+}
+
+/// Invitacion por correo, enlace o codigo de grupo.
+model Invitation {
+  id        String       @id @default(uuid(7))
+  orgId     String
+  org       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  groupId   String?
+  code      String       @unique
+  role      OrgRole
+  email     String?
+  name      String?
+  birthDate DateTime?
+  maxUses   Int          @default(1)
+  uses      Int          @default(0)
+  expiresAt DateTime
+  createdBy String?
+  createdAt DateTime     @default(now())
+
+  @@index([orgId])
+}
+
+/// Tarea del docente para un grupo (practica, Writing, Speaking o simulacro).
+model Assignment {
+  id        String             @id @default(uuid(7))
+  groupId   String
+  group     Group              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  createdBy String
+  /// PRACTICE | WRITING | SPEAKING | MOCK
+  kind      String
+  title     String
+  config    Json
+  opensAt   DateTime
+  closesAt  DateTime
+  /// simulacro institucional: forma reservada para todo el grupo
+  formId    String?
+  createdAt DateTime           @default(now())
+  results   AssignmentResult[]
+
+  @@index([groupId, closesAt])
+}
+
+model AssignmentResult {
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  memberId     String
+  /// PENDING | DONE
+  status       String     @default("PENDING")
+  attemptId    String?
+  completedAt  DateTime?
+
+  @@id([assignmentId, memberId])
+}
+
+/// Nota y comentario del docente sobre un Writing o Speaking (solo insercion; la mas reciente vale).
+model TeacherReview {
+  id               BigInt   @id @default(autoincrement())
+  /// WRITING | SPEAKING
+  kind             String
+  submissionId     String
+  reviewerMemberId String
+  aiScore          Float?
+  score            Float
+  reason           String
+  comment          String?
+  createdAt        DateTime @default(now())
+
+  @@index([submissionId, createdAt])
+}
+
+model GroupStatsSnapshot {
+  groupId String
+  day     DateTime @db.Date
+  data    Json
+
+  @@id([groupId, day])
+}
+
+/// Regla de acceso por ambito (global, institucion, grupo o usuario).
+model AccessRule {
+  id        String    @id @default(uuid(7))
+  /// GLOBAL | ORG | GROUP | USER
+  scope     String
+  scopeId   String    @default("")
+  resource  String
+  allowed   Boolean
+  limits    Json?
+  reason    String
+  authorId  String?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([scope, scopeId, resource])
+}
+
+/// Alertas: clases o textos de menores, preguntas reportadas.
+model ModerationFlag {
+  id         String    @id @default(uuid(7))
+  orgId      String?
+  userId     String?
+  refId      String?
+  kind       String
+  /// LOW | MEDIUM | HIGH
+  severity   String    @default("MEDIUM")
+  /// OPEN | RESOLVED
+  status     String    @default("OPEN")
+  note       String
+  resolvedBy String?
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+
+  @@index([status, createdAt])
+}
+
+/// Solicitudes de demo desde la pagina de instituciones.
+model InstitutionLead {
+  id          String   @id @default(uuid(7))
+  institution String
+  type        OrgType
+  contactName String
+  email       String
+  phone       String?
+  students    Int
+  exams       String[]
+  message     String?
+  /// NEW | CONTACTED | WON | LOST
+  status      String   @default("NEW")
+  createdAt   DateTime @default(now())
+
+  @@index([status, createdAt])
 }

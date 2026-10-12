@@ -7,6 +7,7 @@ import { z } from "zod";
 import { planById, topupById } from "@/lib/pricing/catalog";
 import { requireUser } from "@/server/auth/dal";
 import { db } from "@/server/db";
+import { isMinorUser } from "@/server/org";
 import { applyPaymentEvent, hasActivePlan } from "@/server/payments/apply-event";
 import { FAKE_PROVIDER_ID, fakePayments } from "@/server/payments/fake-provider";
 
@@ -15,6 +16,8 @@ const Item = z.object({ kind: z.enum(["plan", "topup"]), itemId: z.string().min(
 export async function startCheckout(formData: FormData) {
   const user = await requireUser("/app/planes");
   const { kind, itemId } = Item.parse({ kind: formData.get("kind"), itemId: formData.get("itemId") });
+  // Las cuentas de menores (via institucion) no hacen compras propias.
+  if (await isMinorUser(user.id)) redirect("/app/planes?motivo=menor");
   const plan = kind === "plan" ? planById(itemId) : undefined;
   if (kind === "plan" && !plan) throw new Error("Plan desconocido");
   // El Pase de examen es un complemento de un plan con tutor.

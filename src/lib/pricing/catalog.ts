@@ -198,3 +198,33 @@ export function formatMinutes(seconds: number): string {
   const m = totalMin % 60;
   return m ? `${h} h ${m} min` : `${h} h`;
 }
+
+/** Licencias para instituciones (USD por estudiante al mes, cobro por semestre o año). */
+export interface OrgLicenseDef {
+  id: "estandar" | "intensiva";
+  nameEs: string;
+  priceUsdCents: number;
+  examQuotas: ExamQuotas;
+  features: string[];
+}
+
+export const ORG_LICENSES: readonly OrgLicenseDef[] = [
+  {
+    id: "estandar",
+    nameEs: "Licencia Estándar",
+    priceUsdCents: 1000,
+    examQuotas: { MOCK: 1, WRITING: 4, SPEAKING: 4 },
+    features: ["1 simulacro al mes", "4 correcciones de Writing", "4 partes de Speaking", "Práctica, plan y panel docente ilimitados"],
+  },
+  {
+    id: "intensiva",
+    nameEs: "Licencia Intensiva",
+    priceUsdCents: 1800,
+    examQuotas: { MOCK: 2, WRITING: 8, SPEAKING: 10 },
+    features: ["2 simulacros al mes", "8 correcciones de Writing", "10 partes de Speaking", "Ideal para el último trimestre antes del examen"],
+  },
+];
+
+export function orgLicenseById(id: string): OrgLicenseDef | undefined {
+  return ORG_LICENSES.find((l) => l.id === id);
+}

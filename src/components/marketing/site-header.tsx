@@ -11,6 +11,7 @@ export const NAV_LINKS = [
   { href: "/#vision", label: "Tu tutor te ve" },
   { href: "/#examenes", label: "Exámenes" },
   { href: "/#precios", label: "Precios" },
+  { href: "/instituciones", label: "Instituciones" },
   { href: "/#preguntas", label: "Preguntas" },
 ] as const;
 

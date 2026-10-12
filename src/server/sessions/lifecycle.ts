@@ -15,6 +15,8 @@ import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 import type { Audience, Cefr, EndReason, SessionStatus, TargetLang } from "@/generated/prisma/client";
 import { planById } from "@/lib/pricing/catalog";
+import { can } from "@/server/access";
+import { isMinorUser } from "@/server/org";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { eligibleBuckets, totalAvailable } from "@/server/ledger/allocate";
@@ -76,6 +78,11 @@ export async function startSession(input: StartInput): Promise<StartResult> {
   }
   const audience: Audience = input.audience ?? "ADULT";
   const kids = audience === "KIDS";
+  // Estudiantes menores (via institucion): solo si su institucion activo el tutor con avatar.
+  if (await isMinorUser(input.user.id)) {
+    const access = await can({ id: input.user.id, role: "STUDENT" }, "tutor.avatar");
+    if (!access.allowed) throw new SessionError("FORBIDDEN", access.reason ?? "Tu institución todavía no activó el tutor con avatar.");
+  }
   const pal = await db.tavusPal.findUnique({ where: { variant_audience: { variant: input.language, audience } } });
   if (!pal) throw new SessionError("NOT_CONFIGURED", "El tutor de este idioma aún no está configurado (pnpm tavus:setup).");
 

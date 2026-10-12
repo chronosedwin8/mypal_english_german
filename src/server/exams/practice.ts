@@ -12,6 +12,7 @@ import type { CurrentUser } from "@/server/auth/dal";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { storage } from "@/server/storage";
+import { completeAssignmentFor } from "@/server/org/teaching";
 import { markPlanProgress } from "@/server/study/plan";
 import type { StudySection } from "@/server/study/planner-core";
 
@@ -72,7 +73,7 @@ async function pickBlock(userId: string, exam: ExamCode, section: ExamSectionCod
 
 export async function startPractice(
   user: Pick<CurrentUser, "id" | "role">,
-  input: { exam: ExamCode; mode: PracticeMode; section: ExamSectionCode; part?: number | null; taskType?: string | null },
+  input: { exam: ExamCode; mode: PracticeMode; section: ExamSectionCode; part?: number | null; taskType?: string | null; assignmentId?: string },
 ): Promise<{ attemptId: string }> {
   const access = await can(user, "exam.practice");
   if (!access.allowed) throw new PracticeError("NO_ACCESS", access.reason ?? "No tienes acceso a la práctica.");
@@ -118,6 +119,7 @@ export async function startPractice(
     taskType: input.mode === "DRILL" ? (input.taskType ?? null) : null,
     itemSetIds,
     minutes,
+    assignmentId: input.assignmentId,
   });
 }
 
@@ -132,6 +134,7 @@ export async function createObjectiveAttempt(input: {
   itemSetIds: string[];
   minutes: number | null;
   mockId?: string;
+  assignmentId?: string;
 }): Promise<{ attemptId: string }> {
   const { itemSetIds } = input;
   const blocks = await db.examItemSet.findMany({ where: { id: { in: itemSetIds } }, select: { id: true, content: true } });
@@ -153,7 +156,7 @@ export async function createObjectiveAttempt(input: {
 
   const attempt = await db.$transaction(async (tx) => {
     const a = await tx.examAttempt.create({
-      data: { userId: user.id, exam: input.exam, mode: input.mode, config: config as unknown as Prisma.InputJsonValue },
+      data: { userId: user.id, exam: input.exam, mode: input.mode, config: config as unknown as Prisma.InputJsonValue, assignmentId: input.assignmentId ?? null },
     });
     await tx.examSectionAttempt.create({
       data: {
@@ -403,6 +406,7 @@ export async function submitPractice(attemptId: string, userId: string): Promise
       });
     }
   });
+  await completeAssignmentFor(attemptId).catch(() => undefined);
   if (!config.mockId)
     await markPlanProgress(userId, attempt.exam, { kind: attempt.mode as "DRILL" | "PART" | "SECTION", section: config.section as StudySection, taskType: config.taskType }).catch(() => undefined);
   return scores;

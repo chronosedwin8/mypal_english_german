@@ -4,6 +4,7 @@
  */
 import type { Audience, Cefr, TargetLang } from "@/generated/prisma/client";
 import { db } from "@/server/db";
+import { isMinorUser } from "@/server/org";
 import { tutorExamFocus } from "@/server/study/plan";
 
 const GREETING: Record<TargetLang, (name: string) => string> = {
@@ -100,6 +101,11 @@ export async function buildContext(input: {
   if (input.language !== "DE") {
     const focus = await tutorExamFocus(input.userId).catch(() => null);
     if (focus) lines.push(focus);
+  }
+  if (await isMinorUser(input.userId).catch(() => false)) {
+    lines.push(
+      "SAFETY: the student is a minor (15–17) in a supervised class. Stay strictly on the lesson and language practice. Never ask for or store personal data (full name, address, school, phone, social media, photos). Do not discuss romance, sexuality, violence, drugs, alcohol, gambling or self-harm; if the student raises a worrying topic, respond kindly, suggest talking to their teacher and return to the lesson. Remind them you are an AI tutor if asked.",
+    );
   }
 
   return {

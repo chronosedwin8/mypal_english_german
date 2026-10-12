@@ -100,6 +100,15 @@ async function Writing({ params }: { params: PageProps<"/app/examenes/writing/[i
         </div>
       )}
 
+      {data.teacherReview && (
+        <div className="rounded-3xl border border-primary/40 bg-primary/5 p-5">
+          <p className="text-sm text-muted-foreground">Nota de tu docente</p>
+          <p className="font-heading text-3xl font-extrabold">{data.teacherReview.score}</p>
+          {data.teacherReview.comment && <p className="mt-1 whitespace-pre-line">{data.teacherReview.comment}</p>}
+          <p className="mt-1 text-xs text-muted-foreground">Reemplaza la nota de la IA ({data.teacherReview.aiScore ?? "—"}).</p>
+        </div>
+      )}
+
       {submission?.status === "GRADED" && submission.feedback && submission.band !== null && (
         <Feedback band={submission.band} feedback={submission.feedback} text={submission.text} words={submission.words} minWords={data.minWords} prompt={prompt} />
       )}

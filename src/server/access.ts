@@ -8,6 +8,7 @@ import type { CurrentUser } from "@/server/auth/dal";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { quotaSummary } from "@/server/exams/entitlements";
+import { hasOrgLicense, isMinorUser } from "@/server/org";
 
 export interface AccessDecision {
   allowed: boolean;
@@ -19,11 +20,35 @@ export interface AccessDecision {
 /** Plan activo (cualquier plan) o algun cupo de examen vigente. */
 export async function hasPaidAccess(userId: string): Promise<boolean> {
   const now = new Date();
-  const [sub, quota] = await Promise.all([
+  const [sub, quota, license] = await Promise.all([
     db.subscription.findFirst({ where: { userId, status: { in: ["ACTIVE", "PAST_DUE"] }, currentPeriodEnd: { gt: now } }, select: { id: true } }),
     db.examEntitlement.findFirst({ where: { userId, periodStart: { lte: now }, periodEnd: { gt: now } }, select: { id: true } }),
+    hasOrgLicense(userId, now),
   ]);
-  return Boolean(sub || quota);
+  return Boolean(sub || quota || license);
+}
+
+/** Regla de acceso mas especifica que aplica a la persona (usuario, grupo, institucion o global). */
+export async function accessRuleFor(userId: string, resource: string) {
+  const members = await db.orgMember.findMany({ where: { userId, status: "ACTIVE" }, select: { id: true, orgId: true, studying: { select: { groupId: true } } } });
+  const groupIds = members.flatMap((m) => m.studying.map((g) => g.groupId));
+  const rules = await db.accessRule.findMany({
+    where: {
+      resource,
+      OR: [
+        { scope: "USER", scopeId: userId },
+        { scope: "GROUP", scopeId: { in: groupIds } },
+        { scope: "ORG", scopeId: { in: members.map((m) => m.orgId) } },
+        { scope: "GLOBAL", scopeId: "" },
+      ],
+    },
+  });
+  const valid = rules.filter((r) => !r.expiresAt || r.expiresAt > new Date());
+  for (const scope of ["USER", "GROUP", "ORG", "GLOBAL"]) {
+    const r = valid.find((x) => x.scope === scope);
+    if (r) return r;
+  }
+  return null;
 }
 
 export async function can(user: Pick<CurrentUser, "id" | "role">, resource: Resource): Promise<AccessDecision> {
@@ -34,6 +59,22 @@ export async function can(user: Pick<CurrentUser, "id" | "role">, resource: Reso
     return { allowed: admin, unlimited: admin, reason: "Los exámenes están en pausa." };
   }
   if (admin) return { allowed: true, unlimited: true };
+
+  // Reglas explicitas (docente o administrador): usuario > grupo > institucion > global.
+  const rule = await accessRuleFor(user.id, resource);
+  if (rule && !rule.allowed) return { allowed: false, unlimited: false, reason: rule.reason };
+
+  // Menores (15–17, solo via institucion): la IA en vivo necesita un proveedor que admita
+  // menores (MINORS_AI_DRIVER); el tutor con avatar, que la institucion lo active.
+  const minor = await isMinorUser(user.id);
+  if (minor) {
+    if ((resource === "exam.writing" || resource === "exam.speaking" || resource === "exam.mock") && !process.env.MINORS_AI_DRIVER?.trim())
+      return { allowed: false, unlimited: false, reason: "La corrección con IA aún no está disponible para cuentas de menores de edad. Tu docente puede revisar tus textos." };
+    if (resource === "tutor.avatar" || resource === "tutor.kids") {
+      const ok = await db.orgMember.findFirst({ where: { userId: user.id, status: "ACTIVE", isMinor: true, org: { avatarForMinors: true } }, select: { id: true } });
+      if (!ok) return { allowed: false, unlimited: false, reason: "Tu institución todavía no activó el tutor con avatar." };
+    }
+  }
 
   switch (resource) {
     case "exam.practice": {

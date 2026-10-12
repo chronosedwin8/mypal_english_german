@@ -19,6 +19,7 @@ const NOTICES: Record<string, string> = {
   "sin-minutos": "No tienes minutos disponibles. Elige un plan o una recarga para seguir.",
   "recarga-sin-plan": "Las recargas son para quienes ya tienen un plan activo.",
   "pago-invalido": "El enlace de pago no es válido o expiró. Inténtalo de nuevo.",
+  menor: "Las cuentas de estudiantes menores de edad no hacen compras: tu institución te da acceso a la práctica y a los simulacros.",
   "pase-sin-plan": "El Pase de examen es un complemento: primero necesitas un plan con tutor. Si solo quieres prepararte para el examen, elige el Plan Examen.",
 };
 

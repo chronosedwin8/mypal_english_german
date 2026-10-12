@@ -3,7 +3,7 @@
  * en el peor caso. Falla (exit 1) si alguno no lo cumple.
  *   pnpm check:pricing
  */
-import { EXAM_PRODUCTS, PLANS, TOPUPS, formatUsd } from "@/lib/pricing/catalog";
+import { EXAM_PRODUCTS, ORG_LICENSES, PLANS, TOPUPS, formatUsd } from "@/lib/pricing/catalog";
 import { DEFAULT_COSTS, EXAM_UNIT_COSTS_CENTS, examProductMargin, maxMinutesForPrice, worstCaseMargin } from "@/lib/pricing/margin";
 
 let failed = false;
@@ -28,6 +28,12 @@ for (const p of EXAM_PRODUCTS) {
   console.log(
     `${m.meetsTarget ? "✔" : "✖"} ${p.nameEs.padEnd(18)} ${formatUsd(p.priceUsdCents).padStart(6)}  ${p.examQuotas!.MOCK} simulacros · ${p.examQuotas!.WRITING} Writing · ${p.examQuotas!.SPEAKING} Speaking  margen ${(m.margin * 100).toFixed(1)} %`,
   );
+}
+console.log("\nInstituciones (por estudiante al mes)");
+for (const l of ORG_LICENSES) {
+  const m = examProductMargin({ priceUsdCents: l.priceUsdCents, quotas: l.examQuotas, addon: false });
+  if (!m.meetsTarget) failed = true;
+  console.log(`${m.meetsTarget ? "✔" : "✖"} ${l.nameEs.padEnd(18)} ${formatUsd(l.priceUsdCents).padStart(6)}  margen ${(m.margin * 100).toFixed(1)} %`);
 }
 if (failed) {
   console.error("\n✖ Hay productos por debajo del 60 % de margen.");
