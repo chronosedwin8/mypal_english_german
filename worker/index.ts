@@ -12,6 +12,7 @@ import { db } from "@/server/db";
 import { planBankGaps } from "@/server/exams/bank/planner";
 import { syncOpenMocks } from "@/server/exams/mock";
 import { closeExpiredPractice } from "@/server/exams/practice";
+import { replanAll } from "@/server/study/plan";
 import { processJobs } from "@/server/jobs/handlers";
 import { recoverStaleJobs } from "@/server/jobs/queue";
 import { checkLedgerInvariants } from "@/server/ledger/wallet";
@@ -43,6 +44,7 @@ const loops: Loop[] = [
   { name: "exam-jobs", everyMs: 3_000, run: () => processJobs(2) },
   { name: "exam-expired", everyMs: 15_000, run: () => closeExpiredPractice() },
   { name: "exam-mocks", everyMs: 20_000, run: () => syncOpenMocks() },
+  { name: "study-replan", everyMs: 60 * 60_000, run: () => replanAll() },
   { name: "exam-stale-jobs", everyMs: 5 * 60_000, run: () => recoverStaleJobs(20) },
   {
     name: "exam-bank",

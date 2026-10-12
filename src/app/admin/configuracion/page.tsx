@@ -64,6 +64,8 @@ const LABELS: Partial<Record<ConfigKey, string>> = {
   "exam.testdaf.cutoffs": "Cortes estimados TestDaF → TDN (JSON)",
   "exam.audioUrlSeconds": "Validez de las URLs de audio (segundos)",
   "exam.listening.readSeconds": "Tiempo para leer las preguntas antes de cada audio (segundos)",
+  "study.hoursPerBand": "Plan de estudios: horas para subir una banda (supuesto)",
+  "study.defaultWeeks": "Plan de estudios: semanas a planear sin fecha de examen",
   "kids.maxSessionSeconds": "Máximo por clase en modo niños (segundos)",
 };
 

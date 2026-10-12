@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
@@ -11,6 +12,7 @@ import { MOCK_STAGES, MockError, mockIdOf, skipMockSpeaking, startMock, startMoc
 import { PracticeError, audioUrl, recordTabSwitch, saveAnswer, startPractice, submitPractice } from "@/server/exams/practice";
 import { SpeakingError, startSpeaking, type SpeakingPart } from "@/server/exams/speaking";
 import { WritingError, saveWritingDraft, startWriting, submitWriting } from "@/server/exams/writing";
+import { savePlan, setItemStatus } from "@/server/study/plan";
 
 const StartSchema = z.object({
   exam: z.enum(EXAM_CODES as [string, ...string[]]),
@@ -178,4 +180,59 @@ export async function submitMockWritingAction(mockId: string, texts: Record<stri
     return failure(err);
   }
   redirect(`/app/examenes/simulacro/${mockId}`);
+}
+
+/* ───────────── Plan de estudios y progreso ───────────── */
+
+const band = z.coerce.number().min(1).max(9).multipleOf(0.5);
+
+export async function savePlanAction(formData: FormData) {
+  const user = await requireUser("/app/examenes/plan");
+  const input = z
+    .object({
+      exam: z.enum(EXAM_CODES as [string, ...string[]]),
+      target: band,
+      examDate: z.string().optional(),
+      hoursPerWeek: z.coerce.number().int().min(1).max(40),
+    })
+    .parse(Object.fromEntries(formData));
+  const days = formData.getAll("days").map(Number).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+  const examDate = input.examDate ? new Date(`${input.examDate}T09:00:00Z`) : null;
+  if (examDate && (Number.isNaN(examDate.getTime()) || examDate.getTime() < Date.now()))
+    redirect(`/app/examenes/plan?aviso=${encodeURIComponent("La fecha del examen debe ser futura.")}`);
+  await savePlan(user, { exam: input.exam as never, targets: { overall: input.target }, examDate, hoursPerWeek: input.hoursPerWeek, days: days.length ? days : [1, 3, 5] });
+  redirect("/app/examenes/plan");
+}
+
+export async function setPlanItemAction(formData: FormData) {
+  const user = await requireUser("/app/examenes/plan");
+  const input = z.object({ itemId: z.string().min(1), status: z.enum(["TODO", "DONE", "SKIPPED"]) }).parse(Object.fromEntries(formData));
+  await setItemStatus(input.itemId, user.id, input.status);
+  revalidatePath("/app/examenes/plan");
+}
+
+export async function officialResultAction(formData: FormData) {
+  const user = await requireUser("/app/examenes/progreso");
+  const input = z
+    .object({
+      exam: z.enum(EXAM_CODES as [string, ...string[]]),
+      takenAt: z.string().min(8),
+      overall: band,
+      listening: band,
+      reading: band,
+      writing: band,
+      speaking: band,
+    })
+    .parse(Object.fromEntries(formData));
+  const takenAt = new Date(`${input.takenAt}T12:00:00Z`);
+  if (Number.isNaN(takenAt.getTime()) || takenAt.getTime() > Date.now()) redirect(`/app/examenes/progreso?aviso=${encodeURIComponent("Revisa la fecha del examen.")}`);
+  await db.officialResult.create({
+    data: {
+      userId: user.id,
+      exam: input.exam as never,
+      takenAt,
+      scores: { overall: input.overall, listening: input.listening, reading: input.reading, writing: input.writing, speaking: input.speaking },
+    },
+  });
+  redirect("/app/examenes/progreso?aviso=" + encodeURIComponent("¡Gracias! Usamos tu nota oficial para afinar el simulador."));
 }

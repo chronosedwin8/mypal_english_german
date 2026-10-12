@@ -14,6 +14,7 @@ import { ai } from "@/server/ai";
 import type { CurrentUser } from "@/server/auth/dal";
 import { db } from "@/server/db";
 import { enqueue } from "@/server/jobs/queue";
+import { markPlanProgress } from "@/server/study/plan";
 
 import { consumeQuota, releaseQuota, reserveQuota } from "./entitlements";
 import { formItemSetIds } from "./forms";
@@ -279,6 +280,9 @@ export async function gradeWriting(submissionId: string, opts: { finalAttempt: b
     ]);
     await consumeQuota({ userId: sub.attempt.userId, kind: "WRITING", refId: submissionId });
     await updateWritingMastery(sub.attempt.userId, sub.attempt.exam, combined);
+    await saveVocabulary(sub.attempt.userId, errors.filter((e) => e.type === "vocabulary" || e.type === "spelling"));
+    if (!(sub.attempt.config as { mockId?: string }).mockId)
+      await markPlanProgress(sub.attempt.userId, sub.attempt.exam, { kind: "WRITING", section: "WRITING" }).catch(() => undefined);
     return { status: "GRADED", band };
   } catch (err) {
     if (opts.finalAttempt) {
@@ -289,6 +293,27 @@ export async function gradeWriting(submissionId: string, opts: { finalAttempt: b
     }
     throw err;
   }
+}
+
+/** Los errores de vocabulario del Writing entran a "Mi vocabulario" (repaso espaciado). */
+async function saveVocabulary(userId: string, errors: { quote: string; correction: string; explanationEs: string }[]) {
+  if (!errors.length) return;
+  const profile = await db.languageProfile.findFirst({ where: { userId, language: { in: ["EN_GB", "EN_US"] } }, orderBy: { updatedAt: "desc" } });
+  const language = profile?.language ?? "EN_GB";
+  await db.vocabularyItem.createMany({
+    data: errors
+      .filter((e) => e.correction.split(/\s+/).length <= 4)
+      .map((e) => ({
+        userId,
+        language,
+        term: e.correction.slice(0, 80),
+        termNormalized: e.correction.toLowerCase().trim().slice(0, 80),
+        translationEs: e.explanationEs.slice(0, 200),
+        example: `${e.quote} → ${e.correction}`.slice(0, 300),
+        source: "WRITING",
+      })),
+    skipDuplicates: true,
+  });
 }
 
 async function updateWritingMastery(userId: string, exam: ExamCode, criteria: Record<Criterion, number>) {

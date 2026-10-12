@@ -103,6 +103,10 @@ export const CONFIG_SCHEMA = {
   /** Validez de las URLs prefirmadas de audio (segundos). */
   "exam.audioUrlSeconds": z.number().int().min(30).max(3600).default(300),
 
+  /** Plan de estudios: horas de estudio para subir una banda IELTS (supuesto) y semanas sin fecha. */
+  "study.hoursPerBand": z.number().min(20).max(500).default(150),
+  "study.defaultWeeks": z.number().int().min(2).max(26).default(8),
+
   /** Cola */
   "queue.offerSeconds": z.number().int().min(15).max(300).default(45),
 

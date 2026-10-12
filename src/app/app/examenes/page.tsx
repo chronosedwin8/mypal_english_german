@@ -75,6 +75,17 @@ async function Exams({ searchParams }: { searchParams: PageProps<"/app/examenes"
         </p>
       </div>
 
+      {ready && (
+        <div className="flex flex-wrap gap-3">
+          <Link href="/app/examenes/plan" className={cn(buttonVariants({ variant: "outline" }), "rounded-full")}>
+            Mi plan de estudios
+          </Link>
+          <Link href="/app/examenes/progreso" className={cn(buttonVariants({ variant: "outline" }), "rounded-full")}>
+            Mi progreso
+          </Link>
+        </div>
+      )}
+
       {ready && <PracticeAccess user={user} />}
 
       {ready ? <IeltsPractice user={user} exam={exam} /> : <ComingSoon name={spec.name} />}

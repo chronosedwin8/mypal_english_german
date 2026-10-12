@@ -20,6 +20,7 @@ import type { CurrentUser } from "@/server/auth/dal";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { enqueue } from "@/server/jobs/queue";
+import { markPlanProgress } from "@/server/study/plan";
 import { speechToText, textToSpeech } from "@/server/speech/elevenlabs";
 import { silenceMp3 } from "@/server/speech/mp3";
 import { examVoices, examinerVoice } from "@/server/speech/voices";
@@ -432,6 +433,8 @@ async function finishIfGraded(attemptId: string) {
     where: { id: attemptId },
     data: { status: "COMPLETED", completedAt: new Date(), overall: band, scores: { band, criteria } as Prisma.InputJsonValue },
   });
+  if (!(attempt.config as { mockId?: string }).mockId)
+    await markPlanProgress(attempt.userId, attempt.exam, { kind: "SPEAKING", section: "SPEAKING" }).catch(() => undefined);
   for (const c of SPEAKING_CRITERIA) {
     const key = `speaking:${c}`;
     const prev = await db.skillMastery.findUnique({ where: { userId_exam_key: { userId: attempt.userId, exam: attempt.exam, key } } });

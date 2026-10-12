@@ -12,6 +12,8 @@ import type { CurrentUser } from "@/server/auth/dal";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { storage } from "@/server/storage";
+import { markPlanProgress } from "@/server/study/plan";
+import type { StudySection } from "@/server/study/planner-core";
 
 import type { PublicGroup, QuestionKey } from "./bank/schemas";
 import { formItemSetIds } from "./forms";
@@ -389,6 +391,8 @@ export async function submitPractice(attemptId: string, userId: string): Promise
       });
     }
   });
+  if (!config.mockId)
+    await markPlanProgress(userId, attempt.exam, { kind: attempt.mode as "DRILL" | "PART" | "SECTION", section: config.section as StudySection, taskType: config.taskType }).catch(() => undefined);
   return scores;
 }
 

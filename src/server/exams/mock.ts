@@ -17,6 +17,7 @@ import type { CurrentUser } from "@/server/auth/dal";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { examReportEmail, sendEmail } from "@/server/email";
+import { addMockImprovements, markPlanProgress } from "@/server/study/plan";
 
 import { consumeQuota, releaseQuota, reserveQuota } from "./entitlements";
 import { assembleForm, formItemSetIds, type FormBlocks } from "./forms";
@@ -352,6 +353,9 @@ async function finalizeMock(mockId: string) {
   ]);
   // Si el simulacro no llego a empezar el Listening, el cupo reservado se devuelve.
   await releaseQuota({ userId: mock.userId, kind: "MOCK", refId: mockId });
+  // El simulacro cuenta en el plan y su informe se convierte en tareas de mejora.
+  await markPlanProgress(mock.userId, mock.exam, { kind: "MOCK" }).catch(() => undefined);
+  await addMockImprovements(mockId).catch((err) => console.error("[mock] plan de mejora", err));
 
   const url = `${process.env.APP_URL ?? "http://localhost:3000"}/app/examenes/simulacro/${mockId}`;
   const band = overall !== null ? `banda ${overall.toFixed(1)}` : "tu informe por secciones";

@@ -4,6 +4,7 @@
  */
 import type { Audience, Cefr, TargetLang } from "@/generated/prisma/client";
 import { db } from "@/server/db";
+import { tutorExamFocus } from "@/server/study/plan";
 
 const GREETING: Record<TargetLang, (name: string) => string> = {
   EN_US: (n) => `Hi ${n}! I'm Poly, your English tutor. How are you doing today?`,
@@ -96,6 +97,10 @@ export async function buildContext(input: {
     );
   }
   if (lastTranscript?.summaryEs) lines.push(`Summary of the previous class (in Spanish): ${lastTranscript.summaryEs}`);
+  if (input.language !== "DE") {
+    const focus = await tutorExamFocus(input.userId).catch(() => null);
+    if (focus) lines.push(focus);
+  }
 
   return {
     context: lines.join("\n"),

@@ -1013,6 +1013,8 @@ model StudyPlanItem {
   kind            String
   section         ExamSection?
   taskType        String?
+  /// parte o tarea (Listening/Reading/Writing/Speaking), para ir directo a practicar
+  part            Int?
   minutes         Int
   title           String
   status          String       @default("TODO")
