@@ -91,6 +91,8 @@ export const CONFIG_SCHEMA = {
   "exam.testdaf.cutoffs": z
     .object({ tdn5: z.number(), tdn4: z.number(), tdn3: z.number() })
     .default({ tdn5: 16, tdn4: 12, tdn3: 8 }),
+  /** Segundos para leer las preguntas antes de cada tramo de audio de Listening. */
+  "exam.listening.readSeconds": z.number().int().min(0).max(120).default(30),
   /** Validez de las URLs prefirmadas de audio (segundos). */
   "exam.audioUrlSeconds": z.number().int().min(30).max(3600).default(300),
 

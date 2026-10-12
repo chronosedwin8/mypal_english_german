@@ -10,6 +10,7 @@ import { Client } from "pg";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { planBankGaps } from "@/server/exams/bank/planner";
+import { closeExpiredPractice } from "@/server/exams/practice";
 import { processJobs } from "@/server/jobs/handlers";
 import { recoverStaleJobs } from "@/server/jobs/queue";
 import { checkLedgerInvariants } from "@/server/ledger/wallet";
@@ -39,6 +40,7 @@ const loops: Loop[] = [
   { name: "slots", everyMs: 60_000, run: () => syncSlots() },
   /** Examenes: cola de trabajos de IA (banco, calificaciones). */
   { name: "exam-jobs", everyMs: 3_000, run: () => processJobs(2) },
+  { name: "exam-expired", everyMs: 15_000, run: () => closeExpiredPractice() },
   { name: "exam-stale-jobs", everyMs: 5 * 60_000, run: () => recoverStaleJobs(20) },
   {
     name: "exam-bank",

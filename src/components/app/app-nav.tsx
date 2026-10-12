@@ -1,6 +1,6 @@
 "use client";
 
-import { BookOpenIcon, HomeIcon, SparklesIcon, VideoIcon } from "lucide-react";
+import { BookOpenIcon, GraduationCapIcon, HomeIcon, SparklesIcon, VideoIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 const ITEMS = [
   { href: "/app", label: "Inicio", icon: HomeIcon, exact: true },
   { href: "/app/practicar", label: "Practicar", icon: VideoIcon },
+  { href: "/app/examenes", label: "Exámenes", icon: GraduationCapIcon },
   { href: "/app/vocabulario", label: "Vocabulario", icon: BookOpenIcon },
   { href: "/app/planes", label: "Planes", icon: SparklesIcon },
 ];

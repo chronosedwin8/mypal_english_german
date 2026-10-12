@@ -58,6 +58,7 @@ const LABELS: Partial<Record<ConfigKey, string>> = {
   "exam.writing.task2Weight": "Peso de Writing Tarea 2 frente a Tarea 1",
   "exam.testdaf.cutoffs": "Cortes estimados TestDaF → TDN (JSON)",
   "exam.audioUrlSeconds": "Validez de las URLs de audio (segundos)",
+  "exam.listening.readSeconds": "Tiempo para leer las preguntas antes de cada audio (segundos)",
   "kids.maxSessionSeconds": "Máximo por clase en modo niños (segundos)",
 };
 
