@@ -111,6 +111,8 @@ export function normalizeAnswer(raw: string): string {
   // "0161 496 0732" → "01614960732": grupos separados SOLO por espacios son un numero
   // (no se unen numeros de oraciones o lineas distintas).
   s = s.replace(/(\d)[ \t]+(?=\d)/g, "$1");
+  // Horas: "7.15" = "7:15" (se aplica igual a la clave y a la respuesta).
+  s = s.replace(/\b(\d{1,2})\.(\d{2})\b/g, "$1:$2");
   // puntuacion fuera de las palabras (se conservan ' - . : / dentro)
   s = s.replace(/[^\p{L}\p{N}'\-.:/%$£€\s]/gu, " ").replace(/(^|\s)[.:'\-/]+|[.:'\-/]+(?=\s|$)/g, " ");
   let tokens = s.split(/\s+/).filter(Boolean);

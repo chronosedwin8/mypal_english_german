@@ -84,6 +84,8 @@ export const CONFIG_SCHEMA = {
   "exam.bank.audioMinMatch": z.number().min(0).max(1).default(0.85),
   /** Caracteres por solicitud a ElevenLabs Text to Dialogue (limite ~2.000). */
   "exam.audio.maxCharsPerRequest": z.number().int().min(300).max(2000).default(1800),
+  /** Practicas autocalificadas gratis para quien no tiene plan ni cupo de examen. */
+  "exam.freePractices": z.number().int().min(0).max(50).default(1),
   /** Generacion al momento en practica dirigida (por usuario y dia). */
   "exam.adhoc.dailyPerUser": z.number().int().min(0).max(50).default(3),
   "exam.writing.task2Weight": z.number().min(1).max(4).default(2),

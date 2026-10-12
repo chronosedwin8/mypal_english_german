@@ -54,6 +54,7 @@ const LABELS: Partial<Record<ConfigKey, string>> = {
   "exam.bank.solverMinAgreement": "Aciertos mínimos del resolutor a ciegas (0,5–1)",
   "exam.bank.audioMinMatch": "Coincidencia mínima audio/guion según Scribe (0–1)",
   "exam.audio.maxCharsPerRequest": "Caracteres por solicitud de audio a ElevenLabs",
+  "exam.freePractices": "Prácticas de examen gratis sin plan",
   "exam.adhoc.dailyPerUser": "Generaciones al momento por usuario y día",
   "exam.writing.task2Weight": "Peso de Writing Tarea 2 frente a Tarea 1",
   "exam.testdaf.cutoffs": "Cortes estimados TestDaF → TDN (JSON)",

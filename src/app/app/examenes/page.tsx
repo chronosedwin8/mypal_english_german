@@ -9,12 +9,15 @@ import { EXAMS, EXAM_CODES, isExamCode } from "@/content/exams";
 import type { ExamCode } from "@/content/exams/types";
 import { MODE_ES, SECTION_ES, TASK_TYPE_ES } from "@/lib/exams/labels";
 import { cn } from "@/lib/utils";
+import { can } from "@/server/access";
 import { requireUser } from "@/server/auth/dal";
 import { getConfig } from "@/server/config";
+import { db } from "@/server/db";
+import { quotaSummary } from "@/server/exams/entitlements";
 import { BANK_EXAMS } from "@/server/exams/bank/targets";
 import { practiceOverview, type PracticeConfig, type PracticeScores } from "@/server/exams/practice";
 
-import { startPracticeAction } from "./actions";
+import { startPracticeAction, startWritingAction } from "./actions";
 
 export const metadata = { title: "Exámenes" };
 
@@ -72,9 +75,89 @@ async function Exams({ searchParams }: { searchParams: PageProps<"/app/examenes"
         </p>
       </div>
 
-      {ready ? <IeltsPractice userId={user.id} exam={exam} /> : <ComingSoon name={spec.name} />}
+      {ready && <PracticeAccess user={user} />}
+
+      {ready ? <IeltsPractice user={user} exam={exam} /> : <ComingSoon name={spec.name} />}
 
       <p className="text-xs text-muted-foreground">{spec.disclaimerEs}</p>
+    </div>
+  );
+}
+
+async function PracticeAccess({ user }: { user: { id: string; role: "STUDENT" | "ADMIN" } }) {
+  const access = await can(user, "exam.practice");
+  if (access.allowed) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-4 rounded-3xl border border-primary/30 bg-primary/5 p-5">
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">{access.reason}</p>
+        <p className="text-sm text-muted-foreground">Incluye todos los tipos de pregunta, secciones cronometradas y tu progreso.</p>
+      </div>
+      <Link href="/app/planes" className={cn(buttonVariants(), "rounded-full")}>
+        Ver planes
+      </Link>
+    </div>
+  );
+}
+
+async function WritingCard({ user, exam }: { user: { id: string; role: "STUDENT" | "ADMIN" }; exam: ExamCode }) {
+  const [access, quota, writing] = await Promise.all([
+    can(user, "exam.writing"),
+    quotaSummary(user.id),
+    db.writingSubmission.findMany({
+      where: { attempt: { userId: user.id, exam } },
+      orderBy: { createdAt: "desc" },
+      take: 3,
+      select: { attemptId: true, taskNumber: true, finalScore: true, status: true },
+    }),
+  ]);
+  return (
+    <div className="flex gap-4 rounded-3xl border bg-card p-5">
+      <PenLineIcon className="mt-1 size-5 shrink-0 text-primary" />
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">Writing con corrección por IA</p>
+        <p className="mt-1 text-sm text-muted-foreground">Nota por criterio, errores marcados y tu texto una banda más arriba.</p>
+        {access.allowed ? (
+          <form action={startWritingAction} className="mt-4 space-y-3">
+            <input type="hidden" name="exam" value={exam} />
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" name="timed" defaultChecked className="size-4 accent-primary" /> Con tiempo real (20 o 40 min)
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <Button type="submit" name="task" value="1" size="sm">
+                Task 1 · gráfico
+              </Button>
+              <Button type="submit" name="task" value="2" size="sm" variant="outline">
+                Task 2 · ensayo
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {access.unlimited ? "Administrador: sin límite." : `Te quedan ${quota.WRITING.available} correcciones este periodo.`}
+            </p>
+          </form>
+        ) : (
+          <div className="mt-4 space-y-2">
+            <p className="text-sm">{access.reason}</p>
+            <Link href="/app/planes" className={cn(buttonVariants({ size: "sm" }), "rounded-full")}>
+              Ver el Pase de examen
+            </Link>
+          </div>
+        )}
+        {writing.length > 0 && (
+          <ul className="mt-4 space-y-1 border-t pt-3 text-sm">
+            {writing.map((w) => (
+              <li key={w.attemptId}>
+                <Link href={`/app/examenes/writing/${w.attemptId}`} className="flex justify-between hover:underline">
+                  <span>Task {w.taskNumber}</span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {w.status === "GRADED" && w.finalScore !== null ? `banda ${w.finalScore.toFixed(1)}` : w.status === "PENDING" ? "calificando…" : "sin calificar"}
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
@@ -118,8 +201,8 @@ function StartButton(props: {
   );
 }
 
-async function IeltsPractice({ userId, exam }: { userId: string; exam: ExamCode }) {
-  const { mastery, recent, available } = await practiceOverview(userId, exam);
+async function IeltsPractice({ user, exam }: { user: { id: string; role: "STUDENT" | "ADMIN" }; exam: ExamCode }) {
+  const { mastery, recent, available } = await practiceOverview(user.id, exam);
   const spec = EXAMS[exam];
   const has = (section: string, part?: number) => available.some((a) => a.section === section && (part === undefined || a.part === part) && a._count > 0);
   const objective = spec.sections.filter((s) => s.section === "LISTENING" || s.section === "READING");
@@ -221,20 +304,16 @@ async function IeltsPractice({ userId, exam }: { userId: string; exam: ExamCode 
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2">
-        {[
-          { icon: PenLineIcon, title: "Writing con corrección por IA", text: "Nota por criterio, errores marcados y una versión mejorada." },
-          { icon: MicIcon, title: "Speaking con examinador por voz", text: "Las tres partes del examen, con tarjeta y tiempo real." },
-        ].map((c) => (
-          <div key={c.title} className="flex gap-4 rounded-3xl border border-dashed p-5">
-            <c.icon className="mt-1 size-5 shrink-0 text-muted-foreground" />
-            <div>
-              <p className="font-semibold">
-                {c.title} <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs font-normal">pronto</span>
-              </p>
-              <p className="mt-1 text-sm text-muted-foreground">{c.text}</p>
-            </div>
+        <WritingCard user={user} exam={exam} />
+        <div className="flex gap-4 rounded-3xl border border-dashed p-5">
+          <MicIcon className="mt-1 size-5 shrink-0 text-muted-foreground" />
+          <div>
+            <p className="font-semibold">
+              Speaking con examinador por voz <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs font-normal">pronto</span>
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Las tres partes del examen, con tarjeta y tiempo real.</p>
           </div>
-        ))}
+        </div>
       </section>
 
       {recent.length > 0 && (

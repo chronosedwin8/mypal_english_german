@@ -6,6 +6,7 @@
 import type { Resource } from "@/lib/access/resources";
 import type { CurrentUser } from "@/server/auth/dal";
 import { getConfig } from "@/server/config";
+import { db } from "@/server/db";
 import { quotaSummary } from "@/server/exams/entitlements";
 
 export interface AccessDecision {
@@ -13,6 +14,16 @@ export interface AccessDecision {
   /** el usuario es administrador: uso sin cupo (costo interno) */
   unlimited: boolean;
   reason?: string;
+}
+
+/** Plan activo (cualquier plan) o algun cupo de examen vigente. */
+export async function hasPaidAccess(userId: string): Promise<boolean> {
+  const now = new Date();
+  const [sub, quota] = await Promise.all([
+    db.subscription.findFirst({ where: { userId, status: { in: ["ACTIVE", "PAST_DUE"] }, currentPeriodEnd: { gt: now } }, select: { id: true } }),
+    db.examEntitlement.findFirst({ where: { userId, periodStart: { lte: now }, periodEnd: { gt: now } }, select: { id: true } }),
+  ]);
+  return Boolean(sub || quota);
 }
 
 export async function can(user: Pick<CurrentUser, "id" | "role">, resource: Resource): Promise<AccessDecision> {
@@ -25,9 +36,15 @@ export async function can(user: Pick<CurrentUser, "id" | "role">, resource: Reso
   if (admin) return { allowed: true, unlimited: true };
 
   switch (resource) {
-    case "exam.practice":
-      // Practica autocalificada: costo casi cero, para todos los usuarios con cuenta.
-      return { allowed: true, unlimited: false };
+    case "exam.practice": {
+      // Practica autocalificada: costo casi cero. Ilimitada con cualquier plan o cupo de
+      // examen; quien no ha pagado tiene unas practicas gratis (embudo).
+      if (await hasPaidAccess(user.id)) return { allowed: true, unlimited: false };
+      const used = await db.examAttempt.count({ where: { userId: user.id, mode: { in: ["DRILL", "PART", "SECTION"] } } });
+      return used < config["exam.freePractices"]
+        ? { allowed: true, unlimited: false }
+        : { allowed: false, unlimited: false, reason: "Ya usaste tu práctica gratis. Con cualquier plan la práctica de exámenes es ilimitada." };
+    }
     case "exam.writing":
     case "exam.speaking":
     case "exam.mock": {

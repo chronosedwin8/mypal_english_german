@@ -1,9 +1,10 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { Prisma } from "@/generated/prisma/client";
-import { invalidateConfigCache } from "@/server/config";
+import { invalidateConfigCache, setConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { splitBlock, type AnyBlock } from "@/server/exams/bank/schemas";
+import { grantQuota } from "@/server/exams/entitlements";
 import {
   PracticeError,
   audioUrl,
@@ -22,6 +23,7 @@ import { createTestUser, resetDatabase } from "./helpers";
 beforeEach(async () => {
   await resetDatabase();
   invalidateConfigCache();
+  await setConfig("exam.freePractices", 50, null);
 });
 afterAll(async () => {
   await db.$disconnect();
@@ -111,6 +113,16 @@ describe("practica autocalificada", () => {
       [first, second].map(async (s) => (await db.examSectionAttempt.findFirstOrThrow({ where: { attemptId: s.attemptId } })).itemSetIds[0]),
     );
     expect(new Set(ids)).toEqual(new Set([a.id, b.id]));
+  });
+
+  it("sin plan hay una practica gratis; con cupo de examen es ilimitada", async () => {
+    await setConfig("exam.freePractices", 1, null);
+    const user = asStudent(await createTestUser());
+    await approvedBlock({ kind: "reading", data: readingFixture() }, "READING", 1);
+    await startPractice(user, { exam: "IELTS_ACADEMIC", mode: "PART", section: "READING", part: 1 });
+    await expect(startPractice(user, { exam: "IELTS_ACADEMIC", mode: "PART", section: "READING", part: 1 })).rejects.toMatchObject({ code: "NO_ACCESS" });
+    await grantQuota({ userId: user.id, kind: "MOCK", amount: 1, sourceKey: "pase:test", periodStart: new Date(Date.now() - 1000), periodEnd: new Date(Date.now() + 86_400_000) });
+    await expect(startPractice(user, { exam: "IELTS_ACADEMIC", mode: "PART", section: "READING", part: 1 })).resolves.toHaveProperty("attemptId");
   });
 
   it("sin material aprobado avisa en vez de fallar", async () => {

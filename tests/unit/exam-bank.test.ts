@@ -24,6 +24,7 @@ describe("respuestas objetivas", () => {
     expect(normalizeAnswer("0161 496 0732")).toBe("01614960732");
     expect(normalizeAnswer("grey")).toBe("gray");
     expect(normalizeAnswer("twenty five")).toBe("25");
+    expect(normalizeAnswer("7.15")).toBe(normalizeAnswer("7:15"));
   });
 
   it("no une numeros de lineas u oraciones distintas", () => {

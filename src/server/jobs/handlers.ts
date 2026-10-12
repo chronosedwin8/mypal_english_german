@@ -7,10 +7,14 @@ import { z } from "zod";
 import { EXAM_CODES } from "@/content/exams";
 import { db } from "@/server/db";
 import { attachAudio, produceBlock } from "@/server/exams/bank/pipeline";
+import { gradeWriting } from "@/server/exams/writing";
 
 import { claimJobs, completeJob, failJob, type JobType } from "./queue";
 
-type Handler = (payload: unknown) => Promise<Record<string, unknown>>;
+type Handler = (payload: unknown, job: { attempts: number }) => Promise<Record<string, unknown>>;
+
+/** Intentos por trabajo antes de quedar FAILED (debe coincidir con failJob). */
+const MAX_ATTEMPTS = 3;
 
 const GeneratePayload = z.object({
   exam: z.enum(EXAM_CODES as [string, ...string[]]),
@@ -36,6 +40,10 @@ const HANDLERS: Partial<Record<JobType, Handler>> = {
     if (r.status === "FAILED") throw new Error(r.issues.join("; "));
     return { status: r.status, issues: r.issues, costMicroUsd: String(r.costMicroUsd) };
   },
+  "writing.grade": async (payload, job) => {
+    const { submissionId } = z.object({ submissionId: z.string() }).parse(payload);
+    return gradeWriting(submissionId, { finalAttempt: job.attempts >= MAX_ATTEMPTS });
+  },
 };
 
 export const HANDLED_JOB_TYPES = Object.keys(HANDLERS) as JobType[];
@@ -48,11 +56,11 @@ export async function processJobs(limit = 2): Promise<number> {
       const handler = HANDLERS[job.type as JobType];
       try {
         if (!handler) throw new Error(`Sin manejador para ${job.type}`);
-        await completeJob(job.id, await handler(job.payload));
+        await completeJob(job.id, await handler(job.payload, job));
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error(`[jobs] ${job.type} ${job.id}: ${msg.slice(0, 300)}`);
-        await failJob(job.id, msg);
+        await failJob(job.id, msg, MAX_ATTEMPTS);
       }
     }),
   );
