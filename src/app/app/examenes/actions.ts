@@ -5,7 +5,9 @@ import { z } from "zod";
 
 import { EXAM_CODES } from "@/content/exams";
 import { requireUser } from "@/server/auth/dal";
+import { db } from "@/server/db";
 import { QuotaError } from "@/server/exams/entitlements";
+import { MOCK_STAGES, MockError, mockIdOf, skipMockSpeaking, startMock, startMockStage, submitMockWriting, syncMock } from "@/server/exams/mock";
 import { PracticeError, audioUrl, recordTabSwitch, saveAnswer, startPractice, submitPractice } from "@/server/exams/practice";
 import { SpeakingError, startSpeaking, type SpeakingPart } from "@/server/exams/speaking";
 import { WritingError, saveWritingDraft, startWriting, submitWriting } from "@/server/exams/writing";
@@ -67,6 +69,12 @@ export async function tabSwitchAction(attemptId: string) {
 export async function submitPracticeAction(attemptId: string) {
   const user = await requireUser();
   await submitPractice(attemptId, user.id);
+  const attempt = await db.examAttempt.findFirst({ where: { id: attemptId, userId: user.id }, select: { config: true } });
+  const mockId = mockIdOf(attempt?.config);
+  if (mockId) {
+    await syncMock(mockId);
+    redirect(`/app/examenes/simulacro/${mockId}`);
+  }
   redirect(`/app/examenes/resultado/${attemptId}`);
 }
 
@@ -124,4 +132,50 @@ export async function startSpeakingAction(formData: FormData) {
     throw err;
   }
   redirect(`/app/examenes/speaking/${attemptId}`);
+}
+
+/* ───────────── Simulacro completo ───────────── */
+
+export async function startMockAction(formData: FormData) {
+  const user = await requireUser("/app/examenes");
+  const exam = z.enum(EXAM_CODES as [string, ...string[]]).parse(formData.get("exam"));
+  let mockId: string;
+  try {
+    ({ mockId } = await startMock(user, exam as never));
+  } catch (err) {
+    if (err instanceof MockError) redirect(`/app/examenes?examen=${exam}&aviso=${encodeURIComponent(err.message)}`);
+    if (err instanceof QuotaError) redirect(`/app/examenes?examen=${exam}&aviso=${encodeURIComponent("No te quedan simulacros en tu plan.")}`);
+    throw err;
+  }
+  redirect(`/app/examenes/simulacro/${mockId}`);
+}
+
+export async function startMockStageAction(formData: FormData) {
+  const user = await requireUser("/app/examenes");
+  const input = z.object({ mockId: z.string().min(1), stage: z.enum(MOCK_STAGES) }).parse(Object.fromEntries(formData));
+  let url: string;
+  try {
+    url = await startMockStage(input.mockId, user, input.stage);
+  } catch (err) {
+    if (err instanceof MockError) redirect(`/app/examenes/simulacro/${input.mockId}?aviso=${encodeURIComponent(err.message)}`);
+    throw err;
+  }
+  redirect(url);
+}
+
+export async function skipMockSpeakingAction(formData: FormData) {
+  const user = await requireUser("/app/examenes");
+  const mockId = z.string().min(1).parse(formData.get("mockId"));
+  await skipMockSpeaking(mockId, user.id);
+  redirect(`/app/examenes/simulacro/${mockId}`);
+}
+
+export async function submitMockWritingAction(mockId: string, texts: Record<string, string>): Promise<Result> {
+  const user = await requireUser();
+  try {
+    await submitMockWriting(mockId, user, texts);
+  } catch (err) {
+    return failure(err);
+  }
+  redirect(`/app/examenes/simulacro/${mockId}`);
 }

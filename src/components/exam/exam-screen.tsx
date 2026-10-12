@@ -113,7 +113,7 @@ export function ExamScreen({ view }: { view: PracticeView }) {
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              {view.examName} · {MODE_ES[view.mode]}
+              {view.examName} · {view.mockId ? "Simulacro completo" : MODE_ES[view.mode]}
             </p>
             <p className="font-heading text-lg font-bold">
               {view.sectionName}

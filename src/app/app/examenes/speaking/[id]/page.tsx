@@ -1,6 +1,6 @@
 import { Loader2Icon } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { AutoRefresh } from "@/components/app/auto-refresh";
@@ -40,10 +40,12 @@ async function Speaking({ params }: { params: PageProps<"/app/examenes/speaking/
     throw err;
   }
 
+  const mockId = state.mockId;
+  if (mockId && state.status !== "IN_PROGRESS") redirect(`/app/examenes/simulacro/${mockId}`);
   return (
     <div className="space-y-6 pb-16 md:pb-0">
       <div>
-        <Link href={`/app/examenes?examen=${state.exam}`} className="text-sm text-muted-foreground hover:text-foreground">
+        <Link href={mockId ? `/app/examenes/simulacro/${mockId}` : `/app/examenes?examen=${state.exam}`} className="text-sm text-muted-foreground hover:text-foreground">
           ← Exámenes
         </Link>
         <h1 className="mt-2 font-heading text-3xl font-extrabold tracking-tight">Speaking</h1>

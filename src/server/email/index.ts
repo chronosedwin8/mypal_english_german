@@ -105,3 +105,22 @@ export function resetPasswordEmail(to: string, name: string, url: string): Outgo
     ),
   };
 }
+
+function escapeHtml(s: string) {
+  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+}
+
+export function examReportEmail(to: string, name: string, examName: string, band: string, url: string): OutgoingEmail {
+  return {
+    to,
+    kind: "notice",
+    subject: `Tu informe del simulacro ${examName} está listo`,
+    actionUrl: url,
+    text: `Hola ${name}, ya calificamos tu simulacro de ${examName}. Nota estimada: ${band}. Mira tu informe: ${url}`,
+    html: layout(
+      `¡Listo, ${escapeHtml(name)}!`,
+      `Ya calificamos tu simulacro de <b>${escapeHtml(examName)}</b>. Tu nota estimada es <b>${escapeHtml(band)}</b>. En el informe verás cada sección, tus puntos fuertes y qué practicar ahora.`,
+      { label: "Ver mi informe", url },
+    ),
+  };
+}

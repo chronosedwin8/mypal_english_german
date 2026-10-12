@@ -37,6 +37,8 @@ async function Result({ params }: { params: PageProps<"/app/examenes/resultado/[
   }
   if (!data) redirect(`/app/examenes/practica/${id}`);
   const { attempt, config, scores, blocks } = data;
+  // Secciones de un simulacro: las respuestas se ven en el informe final.
+  if (config.mockId) redirect(`/app/examenes/simulacro/${config.mockId}`);
   const pct = scores.total ? Math.round((scores.correct / scores.total) * 100) : 0;
   const spec = EXAMS[attempt.exam];
 

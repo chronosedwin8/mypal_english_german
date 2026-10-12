@@ -1,6 +1,6 @@
 import { Loader2Icon } from "lucide-react";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { AutoRefresh } from "@/components/app/auto-refresh";
@@ -41,6 +41,8 @@ async function Writing({ params }: { params: PageProps<"/app/examenes/writing/[i
     throw err;
   }
   const { attempt, config, task, submission } = data;
+  // Las tareas de un simulacro se escriben juntas, con un solo reloj.
+  if (config.mockId && !submission) redirect(`/app/examenes/simulacro/${config.mockId}/writing`);
   const prompt = (
     <div className="space-y-4 rounded-2xl border bg-card p-5">
       <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">

@@ -55,6 +55,8 @@ export interface SpeakingConfig {
   parts: SpeakingPart[];
   itemSetIds: string[];
   blocks: { p1?: string; p2?: string };
+  /** Speaking de un simulacro completo (el cupo MOCK lo cubre) */
+  mockId?: string;
 }
 
 type Turn = SpeakingTurn & { source?: "prepared" | "followup" };
@@ -77,8 +79,11 @@ async function pickBlock(userId: string, exam: ExamCode, part: 1 | 2) {
     .sort((a, b) => a.rank - b.rank || a.r - b.r)[0]?.id;
 }
 
-export async function startSpeaking(user: Pick<CurrentUser, "id" | "role">, input: { exam: ExamCode; parts: SpeakingPart[] }) {
-  const access = await can(user, "exam.speaking");
+export async function startSpeaking(
+  user: Pick<CurrentUser, "id" | "role">,
+  input: { exam: ExamCode; parts: SpeakingPart[]; mock?: { mockId: string; p1: string; p2: string } },
+) {
+  const access = input.mock ? { allowed: true, unlimited: true, reason: undefined } : await can(user, "exam.speaking");
   if (!access.allowed) throw new SpeakingError("NO_ACCESS", access.reason ?? "No tienes partes de Speaking disponibles.");
   const parts = [...new Set(input.parts)].sort() as SpeakingPart[];
   if (!access.unlimited) {
@@ -87,12 +92,17 @@ export async function startSpeaking(user: Pick<CurrentUser, "id" | "role">, inpu
       throw new SpeakingError("NO_ACCESS", `Esta práctica usa ${parts.length} partes de Speaking y te quedan ${q.SPEAKING.available}.`);
   }
   const blocks: SpeakingConfig["blocks"] = {};
-  if (parts.includes(1)) blocks.p1 = await pickBlock(user.id, input.exam, 1);
-  if (parts.includes(2) || parts.includes(3)) blocks.p2 = await pickBlock(user.id, input.exam, 2);
+  if (input.mock) {
+    blocks.p1 = input.mock.p1;
+    blocks.p2 = input.mock.p2;
+  } else {
+    if (parts.includes(1)) blocks.p1 = await pickBlock(user.id, input.exam, 1);
+    if (parts.includes(2) || parts.includes(3)) blocks.p2 = await pickBlock(user.id, input.exam, 2);
+  }
   if ((parts.includes(1) && !blocks.p1) || ((parts.includes(2) || parts.includes(3)) && !blocks.p2))
     throw new SpeakingError("NO_CONTENT", "Todavía no hay preguntas de Speaking aprobadas.");
   const itemSetIds = [blocks.p1, blocks.p2].filter(Boolean) as string[];
-  const config: SpeakingConfig = { section: "SPEAKING", parts, itemSetIds, blocks };
+  const config: SpeakingConfig = { section: "SPEAKING", parts, itemSetIds, blocks, ...(input.mock ? { mockId: input.mock.mockId } : {}) };
 
   const { attemptId, submissions } = await db.$transaction(async (tx) => {
     const a = await tx.examAttempt.create({
@@ -103,8 +113,8 @@ export async function startSpeaking(user: Pick<CurrentUser, "id" | "role">, inpu
       subs.push(await tx.speakingSubmission.create({ data: { attemptId: a.id, part, itemSetId: part === 1 ? blocks.p1 : blocks.p2 } }));
     for (const id of itemSetIds)
       await tx.itemExposure.upsert({
-        where: { userId_itemSetId_mode: { userId: user.id, itemSetId: id, mode: "SPEAKING" } },
-        create: { userId: user.id, itemSetId: id, mode: "SPEAKING" },
+        where: { userId_itemSetId_mode: { userId: user.id, itemSetId: id, mode: input.mock ? "MOCK" : "SPEAKING" } },
+        create: { userId: user.id, itemSetId: id, mode: input.mock ? "MOCK" : "SPEAKING" },
         update: { seenAt: new Date() },
       });
     return { attemptId: a.id, submissions: subs };
@@ -305,6 +315,7 @@ export async function speakingState(attemptId: string, userId: string) {
     attemptId: attempt.id,
     exam: attempt.exam,
     status: attempt.status,
+    mockId: config.mockId ?? null,
     parts: attempt.speaking.map((s) => ({ part: s.part, status: s.status, band: s.finalScore })),
     current: current
       ? {

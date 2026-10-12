@@ -26,6 +26,8 @@ export interface PracticeConfig {
   itemSetIds: string[];
   /** preguntas incluidas (en DRILL solo las del tipo elegido) */
   questionNumbers: Record<string, number[]>;
+  /** seccion de un simulacro completo */
+  mockId?: string;
 }
 
 export class PracticeError extends Error {
@@ -101,27 +103,50 @@ export async function startPractice(
   }
   if (!itemSetIds.length) throw new PracticeError("NO_CONTENT", "Todavía no hay material aprobado para esa práctica.");
 
+  let minutes: number | null = null;
+  if (input.mode === "SECTION") minutes = spec.minutes + (spec.reviewMinutes ?? 0);
+  else if (input.mode === "PART") minutes = spec.parts.find((p) => p.part === input.part)!.minutes + (input.section === "LISTENING" ? 2 : 0);
+  return createObjectiveAttempt({
+    userId: user.id,
+    exam: input.exam,
+    mode: input.mode,
+    section: input.section,
+    part: input.mode === "PART" ? (input.part ?? 1) : null,
+    taskType: input.mode === "DRILL" ? (input.taskType ?? null) : null,
+    itemSetIds,
+    minutes,
+  });
+}
+
+/** Crea el intento con los bloques ya elegidos (practica o seccion de un simulacro). */
+export async function createObjectiveAttempt(input: {
+  userId: string;
+  exam: ExamCode;
+  mode: PracticeMode;
+  section: ExamSectionCode;
+  part: number | null;
+  taskType: string | null;
+  itemSetIds: string[];
+  minutes: number | null;
+  mockId?: string;
+}): Promise<{ attemptId: string }> {
+  const { itemSetIds } = input;
   const blocks = await db.examItemSet.findMany({ where: { id: { in: itemSetIds } }, select: { id: true, content: true } });
   const questionNumbers: Record<string, number[]> = {};
   for (const b of blocks) {
     const groups = (b.content as unknown as { groups: PublicGroup[] }).groups;
-    questionNumbers[b.id] = groups
-      .filter((g) => input.mode !== "DRILL" || !input.taskType || g.taskType === input.taskType)
-      .flatMap((g) => g.questions.map((q) => q.number));
+    questionNumbers[b.id] = groups.filter((g) => !input.taskType || g.taskType === input.taskType).flatMap((g) => g.questions.map((q) => q.number));
   }
-
-  const now = Date.now();
-  let minutes: number | null = null;
-  if (input.mode === "SECTION") minutes = spec.minutes + (spec.reviewMinutes ?? 0);
-  else if (input.mode === "PART") minutes = spec.parts.find((p) => p.part === input.part)!.minutes + (input.section === "LISTENING" ? 2 : 0);
-
   const config: PracticeConfig = {
     section: input.section,
-    part: input.mode === "SECTION" ? null : input.mode === "PART" ? (input.part ?? 1) : null,
-    taskType: input.mode === "DRILL" ? (input.taskType ?? null) : null,
+    part: input.part,
+    taskType: input.taskType,
     itemSetIds,
     questionNumbers,
+    ...(input.mockId ? { mockId: input.mockId } : {}),
   };
+  const now = Date.now();
+  const user = { id: input.userId };
 
   const attempt = await db.$transaction(async (tx) => {
     const a = await tx.examAttempt.create({
@@ -133,13 +158,13 @@ export async function startPractice(
         section: input.section,
         part: config.part ?? 0,
         itemSetIds,
-        deadlineAt: minutes ? new Date(now + minutes * 60_000) : null,
+        deadlineAt: input.minutes ? new Date(now + input.minutes * 60_000) : null,
       },
     });
     for (const id of itemSetIds)
       await tx.itemExposure.upsert({
-        where: { userId_itemSetId_mode: { userId: user.id, itemSetId: id, mode: input.mode } },
-        create: { userId: user.id, itemSetId: id, mode: input.mode },
+        where: { userId_itemSetId_mode: { userId: user.id, itemSetId: id, mode: input.mockId ? "MOCK" : input.mode } },
+        create: { userId: user.id, itemSetId: id, mode: input.mockId ? "MOCK" : input.mode },
         update: { seenAt: new Date() },
       });
     return a;
@@ -155,6 +180,8 @@ export interface PracticeView {
   examName: string;
   mode: PracticeMode;
   status: string;
+  /** seccion de un simulacro completo */
+  mockId: string | null;
   section: ExamSectionCode;
   sectionName: string;
   part: number | null;
@@ -199,6 +226,7 @@ export async function loadPractice(attemptId: string, userId: string): Promise<P
     examName: examSpec(attempt.exam).name,
     mode: attempt.mode as PracticeMode,
     status: attempt.status,
+    mockId: config.mockId ?? null,
     section: config.section,
     sectionName: spec.name,
     part: config.part,
@@ -421,10 +449,11 @@ export async function practiceOverview(userId: string, exam: ExamCode) {
     db.examAttempt.findMany({
       where: { userId, exam, mode: { in: ["DRILL", "PART", "SECTION"] } },
       orderBy: { startedAt: "desc" },
-      take: 8,
+      take: 16,
       select: { id: true, mode: true, status: true, config: true, scores: true, overall: true, startedAt: true },
     }),
     db.examItemSet.groupBy({ by: ["section", "part"], where: { exam, status: "APPROVED" }, _count: true }),
   ]);
-  return { mastery, recent, available: counts };
+  // Las secciones de un simulacro se ven en su informe, no como practicas sueltas.
+  return { mastery, recent: recent.filter((a) => !(a.config as { mockId?: string }).mockId), available: counts };
 }

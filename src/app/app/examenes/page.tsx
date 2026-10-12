@@ -17,7 +17,7 @@ import { quotaSummary } from "@/server/exams/entitlements";
 import { BANK_EXAMS } from "@/server/exams/bank/targets";
 import { practiceOverview, type PracticeConfig, type PracticeScores } from "@/server/exams/practice";
 
-import { startPracticeAction, startSpeakingAction, startWritingAction } from "./actions";
+import { startMockAction, startPracticeAction, startSpeakingAction, startWritingAction } from "./actions";
 
 export const metadata = { title: "Exámenes" };
 
@@ -100,17 +100,64 @@ async function PracticeAccess({ user }: { user: { id: string; role: "STUDENT" | 
   );
 }
 
+async function MockCard({ user, exam }: { user: { id: string; role: "STUDENT" | "ADMIN" }; exam: ExamCode }) {
+  const [access, quota, open, last] = await Promise.all([
+    can(user, "exam.mock"),
+    quotaSummary(user.id),
+    db.examAttempt.findFirst({ where: { userId: user.id, exam, mode: "MOCK", status: { in: ["IN_PROGRESS", "SCORING"] } }, select: { id: true } }),
+    db.examAttempt.findFirst({
+      where: { userId: user.id, exam, mode: "MOCK", status: "COMPLETED" },
+      orderBy: { completedAt: "desc" },
+      select: { id: true, overall: true },
+    }),
+  ]);
+  return (
+    <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/15 via-card to-card p-6">
+      <p className="text-sm font-semibold uppercase tracking-wide text-primary">Simulacro completo</p>
+      <h2 className="mt-1 font-heading text-2xl font-extrabold">El examen entero, con nota en la escala oficial</h2>
+      <p className="mt-2 max-w-2xl text-muted-foreground">
+        Listening, Reading, Writing y Speaking con tiempos reales, audio una sola vez y un informe con tus fortalezas y qué practicar.
+      </p>
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        {open ? (
+          <Link href={`/app/examenes/simulacro/${open.id}`} className={buttonVariants()}>
+            Continuar mi simulacro
+          </Link>
+        ) : access.allowed ? (
+          <form action={startMockAction}>
+            <input type="hidden" name="exam" value={exam} />
+            <Button type="submit">Empezar simulacro</Button>
+          </form>
+        ) : (
+          <Link href="/app/planes" className={buttonVariants()}>
+            Ver el Pase de examen
+          </Link>
+        )}
+        {last && (
+          <Link href={`/app/examenes/simulacro/${last.id}`} className={buttonVariants({ variant: "outline" })}>
+            Último informe{last.overall !== null ? ` · banda ${last.overall.toFixed(1)}` : ""}
+          </Link>
+        )}
+        <span className="text-xs text-muted-foreground">
+          {access.unlimited ? "Administrador: sin límite." : access.allowed ? `Te quedan ${quota.MOCK.available} simulacros.` : access.reason}
+        </span>
+      </div>
+    </section>
+  );
+}
+
 async function SpeakingCard({ user, exam }: { user: { id: string; role: "STUDENT" | "ADMIN" }; exam: ExamCode }) {
-  const [access, quota, recent] = await Promise.all([
+  const [access, quota, recentAll] = await Promise.all([
     can(user, "exam.speaking"),
     quotaSummary(user.id),
     db.examAttempt.findMany({
       where: { userId: user.id, exam, mode: "SPEAKING", status: { not: "VOIDED" } },
       orderBy: { startedAt: "desc" },
-      take: 3,
+      take: 8,
       select: { id: true, status: true, overall: true, config: true },
     }),
   ]);
+  const recent = recentAll.filter((a) => !(a.config as { mockId?: string }).mockId).slice(0, 3);
   return (
     <div className="flex gap-4 rounded-3xl border bg-card p-5">
       <MicIcon className="mt-1 size-5 shrink-0 text-primary" />
@@ -162,16 +209,17 @@ async function SpeakingCard({ user, exam }: { user: { id: string; role: "STUDENT
 }
 
 async function WritingCard({ user, exam }: { user: { id: string; role: "STUDENT" | "ADMIN" }; exam: ExamCode }) {
-  const [access, quota, writing] = await Promise.all([
+  const [access, quota, writingAll] = await Promise.all([
     can(user, "exam.writing"),
     quotaSummary(user.id),
     db.writingSubmission.findMany({
       where: { attempt: { userId: user.id, exam } },
       orderBy: { createdAt: "desc" },
-      take: 3,
-      select: { attemptId: true, taskNumber: true, finalScore: true, status: true },
+      take: 8,
+      select: { attemptId: true, taskNumber: true, finalScore: true, status: true, attempt: { select: { config: true } } },
     }),
   ]);
+  const writing = writingAll.filter((w) => !(w.attempt.config as { mockId?: string }).mockId).slice(0, 3);
   return (
     <div className="flex gap-4 rounded-3xl border bg-card p-5">
       <PenLineIcon className="mt-1 size-5 shrink-0 text-primary" />
@@ -270,6 +318,8 @@ async function IeltsPractice({ user, exam }: { user: { id: string; role: "STUDEN
 
   return (
     <div className="space-y-10">
+      <MockCard user={user} exam={exam} />
+
       <section>
         <h2 className="font-heading text-xl font-bold">Sección cronometrada</h2>
         <p className="text-sm text-muted-foreground">Como el día del examen: tiempo real y nota en bandas.</p>

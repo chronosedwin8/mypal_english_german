@@ -68,6 +68,27 @@ export interface WritingConfig {
   part: number;
   itemSetIds: string[];
   timed: boolean;
+  /** tarea de un simulacro completo (el cupo MOCK la cubre) */
+  mockId?: string;
+}
+
+/** Tarea de Writing de un simulacro: bloque de la forma y reloj compartido. */
+export async function createMockWriting(input: { userId: string; exam: ExamCode; task: 1 | 2; itemSetId: string; deadlineAt: Date; mockId: string }) {
+  const config: WritingConfig = { section: "WRITING", part: input.task, itemSetIds: [input.itemSetId], timed: true, mockId: input.mockId };
+  return db.$transaction(async (tx) => {
+    const a = await tx.examAttempt.create({
+      data: { userId: input.userId, exam: input.exam, mode: "WRITING", config: config as unknown as Prisma.InputJsonValue },
+    });
+    await tx.examSectionAttempt.create({
+      data: { attemptId: a.id, section: "WRITING", part: input.task, itemSetIds: [input.itemSetId], deadlineAt: input.deadlineAt },
+    });
+    await tx.itemExposure.upsert({
+      where: { userId_itemSetId_mode: { userId: input.userId, itemSetId: input.itemSetId, mode: "MOCK" } },
+      create: { userId: input.userId, itemSetId: input.itemSetId, mode: "MOCK" },
+      update: { seenAt: new Date() },
+    });
+    return { attemptId: a.id };
+  });
 }
 
 /* ───────────────────────── empezar y guardar ───────────────────────── */
@@ -152,9 +173,11 @@ export async function submitWriting(attemptId: string, user: Pick<CurrentUser, "
   });
   const body = String((draft?.answer as { value?: string } | undefined)?.value ?? "").trim();
   const words = countWords(body);
-  if (words < 20) throw new WritingError("TOO_SHORT", "Escribe al menos 20 palabras para poder calificar tu texto.");
+  // En un simulacro se califica lo que haya (aunque sea poco), como en el examen.
+  if (words < 20 && !config.mockId) throw new WritingError("TOO_SHORT", "Escribe al menos 20 palabras para poder calificar tu texto.");
 
-  const access = await can(user, "exam.writing");
+  // En un simulacro la correccion la cubre el cupo MOCK.
+  const access = config.mockId ? { unlimited: true } : await can(user, "exam.writing");
   const submission = await db.writingSubmission.create({
     data: { attemptId, taskNumber: config.part, itemSetId: config.itemSetIds[0], text: body, words },
   });
