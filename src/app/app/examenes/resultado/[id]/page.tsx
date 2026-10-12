@@ -64,9 +64,24 @@ async function Result({ params }: { params: PageProps<"/app/examenes/resultado/[
             <span className="text-2xl text-muted-foreground">/{scores.total}</span>
           </p>
           <Progress value={pct} className="mt-4 h-2" />
-          {scores.band !== null && (
+          {attempt.exam === "IELTS_ACADEMIC" && scores.band !== null && (
             <p className="mt-4 text-sm">
               Banda {scores.bandIsEstimate ? "estimada" : ""} <b className="text-lg">{scores.band.toFixed(1)}</b> · MCER {ieltsToCefr(scores.band)}
+            </p>
+          )}
+          {attempt.exam !== "IELTS_ACADEMIC" && scores.scale && (
+            <p className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+              Nota {scores.scale.estimate ? "estimada" : ""} <b className="text-lg">{scores.scale.label}</b>
+              {scores.scale.pass !== undefined && (
+                <span
+                  className={cn(
+                    "rounded-full px-2.5 py-0.5 text-xs font-bold",
+                    scores.scale.pass ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200",
+                  )}
+                >
+                  {scores.scale.pass ? "Aprobado (60+)" : "No aprobado (menos de 60)"}
+                </span>
+              )}
             </p>
           )}
           <p className="mt-2 text-xs text-muted-foreground">
@@ -111,7 +126,10 @@ async function Result({ params }: { params: PageProps<"/app/examenes/resultado/[
       {blocks.map((b) => (
         <section key={b.id} className="space-y-4">
           <h2 className="font-heading text-xl font-bold">
-            {config.section === "LISTENING" ? "Part" : "Passage"} {b.part} · <span className="font-normal text-muted-foreground">{b.topic}</span>
+            {attempt.exam === "IELTS_ACADEMIC"
+              ? `${config.section === "LISTENING" ? "Part" : "Passage"} ${b.part}`
+              : (spec.sections.find((x) => x.section === config.section)?.parts.find((p) => p.part === b.part)?.title ?? `Teil ${b.part}`)}{" "}
+            · <span className="font-normal text-muted-foreground">{b.topic}</span>
           </h2>
 
           {b.content.passage && (

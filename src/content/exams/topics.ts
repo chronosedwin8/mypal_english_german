@@ -4,7 +4,7 @@
  */
 import type { BankKind } from "./types";
 
-export const TOPIC_DOMAINS: Record<BankKind, string[]> = {
+export const TOPIC_DOMAINS: Record<Exclude<BankKind, "writingTask" | "speakingTask">, string[]> = {
   reading: [
     "marine biology", "archaeology", "urban planning", "history of technology", "cognitive psychology",
     "materials science", "linguistics", "agriculture and food security", "renewable energy", "astronomy",
@@ -37,5 +37,27 @@ export const TOPIC_DOMAINS: Record<BankKind, string[]> = {
     "a memorable journey", "a useful skill", "a person who helped you", "a place you would like to visit", "an important decision",
     "a book or film", "a piece of technology", "a celebration", "a building you like", "a time you were very busy",
     "a teacher who influenced you", "a hobby", "a gift", "a café or restaurant", "a goal you have",
+  ],
+};
+
+/** Temas para los examenes de aleman (Goethe, TestDaF): vida cotidiana, trabajo, estudio y sociedad. */
+export const TOPIC_DOMAINS_DE: Record<"reading" | "listening" | "writingTask" | "speakingTask", string[]> = {
+  reading: [
+    "Arbeitswelt und Homeoffice", "Wohnen in der Stadt", "Umwelt und Klimaschutz", "Ernährung und Gesundheit", "Freizeit und Ehrenamt",
+    "Bildung und Weiterbildung", "Digitalisierung im Alltag", "Mobilität und Verkehr", "Kultur und Museen", "Wissenschaft und Forschung",
+    "Tourismus", "Sport im Verein", "Konsum und Nachhaltigkeit", "Familie und Generationen", "Medien und Nachrichten",
+  ],
+  listening: [
+    "Durchsagen am Bahnhof", "Radiointerview mit einer Expertin", "Gespräch unter Kollegen", "Vortrag an der Volkshochschule",
+    "Diskussion über Stadtplanung", "Telefonnachricht beim Arzt", "Führung durch ein Museum", "Podcast über Ernährung",
+    "Seminar an der Universität", "Beratung im Studentenwerk", "Gespräch auf dem Wochenmarkt", "Vorlesung über Klimaforschung",
+  ],
+  writingTask: [
+    "Homeoffice", "Ehrenamt", "Plastikmüll", "soziale Medien", "Sprachenlernen", "Wohnungssuche", "Kurse an der Volkshochschule",
+    "Arbeitszeiten", "Tourismus in Städten", "Online-Unterricht", "Fahrradstadt", "Lebensmittelverschwendung",
+  ],
+  speakingTask: [
+    "ein Fest planen", "Freizeitangebote", "Studium im Ausland", "Rauchverbot", "Fahrverbote in Innenstädten", "Haustiere",
+    "Kunst im öffentlichen Raum", "Teilzeitarbeit", "Smartphones in der Schule", "regionale Produkte", "Mehrsprachigkeit",
   ],
 };

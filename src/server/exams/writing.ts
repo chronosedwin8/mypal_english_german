@@ -6,18 +6,21 @@
  */
 import { z } from "zod";
 
-import { partSpec } from "@/content/exams";
+import { examSpec, partSpec } from "@/content/exams";
 import type { ExamCode } from "@/content/exams/types";
 import type { Prisma } from "@/generated/prisma/client";
 import { can } from "@/server/access";
 import { ai } from "@/server/ai";
 import type { CurrentUser } from "@/server/auth/dal";
+import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 import { enqueue } from "@/server/jobs/queue";
 import { markPlanProgress } from "@/server/study/plan";
 
 import { consumeQuota, releaseQuota, reserveQuota } from "./entitlements";
 import { formItemSetIds } from "./forms";
+import { productiveScale, type ScaleResult } from "./profiles";
+import { GERMAN_RUBRIC_VERSION, criteriaFor, germanGradeSchema, germanGraderSystem, germanWritingPrompt } from "./scoring/german-graders";
 import { countWords } from "./scoring/objective";
 import { WRITING_GRADER_SYSTEM, WRITING_RUBRIC_VERSION, writingGradePrompt } from "./scoring/writing-rubric";
 
@@ -54,7 +57,12 @@ const FeedbackSchema = GradeSchema.extend({
 type Grade = z.infer<typeof GradeSchema>;
 
 export interface WritingFeedback {
-  criteria: Record<Criterion, { band: number; commentEs: string }>;
+  /** IELTS: TA/CC/LR/GRA en bandas 0–9 · aleman: criterios del examen de 0 a 5 */
+  criteria: Record<string, { band: number; commentEs: string }>;
+  /** nombres de los criterios (aleman) */
+  criteriaLabels?: Record<string, string>;
+  /** nota en la escala del examen (aleman: puntos Goethe o TDN) */
+  scale?: ScaleResult;
   overviewEs: string;
   errors: z.infer<typeof FeedbackSchema>["errors"];
   improvedVersion: string;
@@ -74,7 +82,7 @@ export interface WritingConfig {
 }
 
 /** Tarea de Writing de un simulacro: bloque de la forma y reloj compartido. */
-export async function createMockWriting(input: { userId: string; exam: ExamCode; task: 1 | 2; itemSetId: string; deadlineAt: Date; mockId: string }) {
+export async function createMockWriting(input: { userId: string; exam: ExamCode; task: number; itemSetId: string; deadlineAt: Date; mockId: string }) {
   const config: WritingConfig = { section: "WRITING", part: input.task, itemSetIds: [input.itemSetId], timed: true, mockId: input.mockId };
   return db.$transaction(async (tx) => {
     const a = await tx.examAttempt.create({
@@ -94,7 +102,7 @@ export async function createMockWriting(input: { userId: string; exam: ExamCode;
 
 /* ───────────────────────── empezar y guardar ───────────────────────── */
 
-export async function startWriting(user: Pick<CurrentUser, "id" | "role">, input: { exam: ExamCode; task: 1 | 2; timed: boolean }) {
+export async function startWriting(user: Pick<CurrentUser, "id" | "role">, input: { exam: ExamCode; task: number; timed: boolean }) {
   const access = await can(user, "exam.writing");
   if (!access.allowed) throw new WritingError("NO_ACCESS", access.reason ?? "No tienes correcciones de Writing disponibles.");
   const [candidates, seen, forms] = await Promise.all([
@@ -219,6 +227,7 @@ export function gradersDisagree(a: Grade, b: Grade): boolean {
 export async function gradeWriting(submissionId: string, opts: { finalAttempt: boolean }) {
   const sub = await db.writingSubmission.findUniqueOrThrow({ where: { id: submissionId }, include: { attempt: true } });
   if (sub.status === "GRADED") return { status: "GRADED", band: sub.finalScore };
+  if (sub.attempt.exam !== "IELTS_ACADEMIC") return gradeWritingGerman(sub, opts);
   try {
     const item = await db.examItemSet.findUniqueOrThrow({ where: { id: sub.itemSetId } });
     const content = item.content as unknown as { prompt: string; chart?: unknown };
@@ -345,7 +354,9 @@ export async function loadWriting(attemptId: string, userId: string) {
   return {
     attempt,
     config,
-    task: item.content as unknown as { kind: string; prompt: string; chart?: unknown; essayType?: string },
+    task: item.content as unknown as { kind: string; prompt: string; chart?: unknown; essayType?: string; contentPoints?: string[] },
+    sectionName: examSpec(attempt.exam).sections.find((x) => x.section === "WRITING")?.name ?? "Writing",
+    partTitle: spec.title,
     minWords: spec.minWords ?? 0,
     minutes: spec.minutes,
     deadlineAt: attempt.sections[0]?.deadlineAt?.toISOString() ?? null,
@@ -361,4 +372,84 @@ export async function loadWriting(attemptId: string, userId: string) {
         }
       : null,
   };
+}
+
+/* ───────────────────────── aleman (Goethe, TestDaF) ───────────────────────── */
+
+type Sub = Awaited<ReturnType<typeof db.writingSubmission.findUniqueOrThrow>> & { attempt: { id: string; userId: string; exam: ExamCode; config: unknown } };
+
+async function gradeWritingGerman(sub: Sub, opts: { finalAttempt: boolean }) {
+  try {
+    const exam = sub.attempt.exam;
+    const item = await db.examItemSet.findUniqueOrThrow({ where: { id: sub.itemSetId } });
+    const content = item.content as unknown as { prompt: string; contentPoints?: string[]; chart?: unknown };
+    const key = item.answerKey as unknown as { modelAnswer: string };
+    const spec = partSpec(exam, "WRITING", sub.taskNumber);
+    const criteria = criteriaFor(exam, "WRITING");
+    const ctx = {
+      examName: examSpec(exam).name,
+      partTitle: spec.title,
+      prompt: content.prompt,
+      contentPoints: content.contentPoints ?? [],
+      minWords: spec.minWords ?? 0,
+      words: sub.words,
+      chart: content.chart,
+      text: sub.text,
+    };
+    const common = { modelKey: "ai.model.grade" as const, system: germanGraderSystem(exam, "WRITING"), userId: sub.attempt.userId, refId: sub.id, purpose: "writing.grade" as const };
+    type G = { criteria: Record<string, { score: number; commentEs: string }> };
+    type F = G & { overviewEs: string; errors: WritingFeedback["errors"]; improvedVersion: string; nextStepsEs: string[] };
+    const [first, second] = await Promise.all([
+      ai().generateJson({ ...common, prompt: germanWritingPrompt(ctx, true), schema: germanGradeSchema(exam, "WRITING", true) as unknown as z.ZodType<F>, temperature: 0.3 }),
+      ai().generateJson({ ...common, prompt: germanWritingPrompt(ctx, false), schema: germanGradeSchema(exam, "WRITING", false) as unknown as z.ZodType<G>, temperature: 0.7 }),
+    ]);
+    const grades: G[] = [first.data, second.data];
+    let cost = first.costMicroUsd + second.costMicroUsd;
+    if (criteria.some((c) => Math.abs(first.data.criteria[c.key].score - second.data.criteria[c.key].score) > 1)) {
+      const third = await ai().generateJson({ ...common, prompt: germanWritingPrompt(ctx, false), schema: germanGradeSchema(exam, "WRITING", false) as unknown as z.ZodType<G>, temperature: 0.5 });
+      grades.push(third.data);
+      cost += third.costMicroUsd;
+    }
+    const combined = Object.fromEntries(
+      criteria.map((c) => {
+        const v = grades.map((g) => g.criteria[c.key].score).sort((a, b) => a - b);
+        return [c.key, v.length >= 3 ? v[1] : (v[0] + v[1]) / 2];
+      }),
+    ) as Record<string, number>;
+    const scale = productiveScale(exam, Object.values(combined), (await getConfig())["exam.testdaf.cutoffs"]);
+    const feedback: WritingFeedback = {
+      criteria: Object.fromEntries(criteria.map((c) => [c.key, { band: combined[c.key], commentEs: first.data.criteria[c.key].commentEs }])),
+      criteriaLabels: Object.fromEntries(criteria.map((c) => [c.key, `${c.labelEs} (${c.de})`])),
+      scale,
+      overviewEs: first.data.overviewEs,
+      errors: first.data.errors.filter((e) => sub.text.includes(e.quote)),
+      improvedVersion: first.data.improvedVersion,
+      nextStepsEs: first.data.nextStepsEs,
+      modelAnswer: key.modelAnswer,
+      rubricVersion: GERMAN_RUBRIC_VERSION,
+      graders: grades.length,
+    };
+    await db.$transaction([
+      db.writingSubmission.update({
+        where: { id: sub.id },
+        data: { status: "GRADED", grades: grades as unknown as Prisma.InputJsonValue, finalScore: scale.value, feedback: feedback as unknown as Prisma.InputJsonValue, costMicroUsd: cost, gradedAt: new Date() },
+      }),
+      db.examAttempt.update({
+        where: { id: sub.attemptId },
+        data: { status: "COMPLETED", completedAt: new Date(), overall: scale.value, scores: { scale, criteria: combined } as unknown as Prisma.InputJsonValue },
+      }),
+      db.examSectionAttempt.updateMany({ where: { attemptId: sub.attemptId }, data: { score: scale.value } }),
+    ]);
+    await consumeQuota({ userId: sub.attempt.userId, kind: "WRITING", refId: sub.id });
+    if (!(sub.attempt.config as { mockId?: string }).mockId)
+      await markPlanProgress(sub.attempt.userId, exam, { kind: "WRITING", section: "WRITING" }).catch(() => undefined);
+    return { status: "GRADED", band: scale.value };
+  } catch (err) {
+    if (opts.finalAttempt) {
+      await releaseQuota({ userId: sub.attempt.userId, kind: "WRITING", refId: sub.id });
+      await db.writingSubmission.update({ where: { id: sub.id }, data: { status: "FAILED" } });
+      await db.examAttempt.update({ where: { id: sub.attemptId }, data: { status: "VOIDED" } });
+    }
+    throw err;
+  }
 }

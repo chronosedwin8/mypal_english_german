@@ -101,7 +101,7 @@ export function fluencyMetrics(turns: SpeakingTurn[]) {
     words += t.words.length;
     if (t.words.length) speakingSeconds += t.words[t.words.length - 1].end - t.words[0].start;
     for (let i = 1; i < t.words.length; i++) if (t.words[i].start - t.words[i - 1].end > 1.5) longPauses++;
-    fillers += t.words.filter((w) => /^(um+|uh+|er+|erm+|hmm+|ah+)[.,]?$/i.test(w.text)).length;
+    fillers += t.words.filter((w) => /^(um+|uh+|er+|erm+|hmm+|ah+|äh+m?|ähm+|öh+)[.,]?$/i.test(w.text)).length;
   }
   const minutes = speakingSeconds / 60;
   return {
@@ -114,3 +114,53 @@ export function fluencyMetrics(turns: SpeakingTurn[]) {
     averageAnswerSeconds: cand.length ? Math.round(cand.reduce((s, t) => s + t.durationMs, 0) / cand.length / 1000) : 0,
   };
 }
+
+/* ───────────── Aleman (Goethe, TestDaF): tareas orales genericas ───────────── */
+
+export interface SpeakingTaskContent {
+  mode: "presentation" | "discussion" | "planning" | "recorded" | "interview";
+  situation: string;
+  points: string[];
+  partnerView: string | null;
+  questions: string[];
+}
+
+export type Speaker = "examiner" | "partner";
+
+/**
+ * Siguiente linea de una tarea oral en aleman. Presentacion y tarea grabada: un
+ * turno largo (y en la presentacion, preguntas despues). Discusion y planificacion:
+ * el companero virtual opina y pregunta; la persona responde por turnos.
+ */
+export function nextTaskTurn(
+  part: number,
+  task: SpeakingTaskContent,
+  turns: SpeakingTurn[],
+  limits: { followUps: number },
+): (ExaminerTurn & { speaker: Speaker }) | null {
+  const answered = turns.filter((t) => t.kind === "candidate").length;
+  const intro = `Teil ${part}. ${task.situation}`;
+  switch (task.mode) {
+    case "recorded":
+      return answered === 0 ? { kind: "examiner", text: intro, expects: "longturn", speaker: "examiner" } : null;
+    case "presentation": {
+      if (answered === 0) return { kind: "examiner", text: intro, expects: "longturn", speaker: "examiner" };
+      const q = task.questions[answered - 1];
+      return q && answered - 1 < limits.followUps ? { kind: "examiner", text: q, expects: "answer", speaker: "partner" } : null;
+    }
+    case "discussion":
+    case "planning": {
+      if (answered === 0)
+        return { kind: "examiner", text: `${intro} ${task.partnerView ?? ""} ${task.questions[0] ?? ""}`.trim(), expects: "answer", speaker: "partner" };
+      const q = task.questions[answered];
+      return q && answered < limits.followUps + 1 ? { kind: "examiner", text: q, expects: "answer", speaker: "partner" } : null;
+    }
+    default: {
+      if (answered === 0) return { kind: "examiner", text: `${intro} ${task.questions[0] ?? ""}`.trim(), expects: "answer", speaker: "examiner" };
+      const q = task.questions[answered];
+      return q && answered < limits.followUps + 1 ? { kind: "examiner", text: q, expects: "answer", speaker: "examiner" } : null;
+    }
+  }
+}
+
+export const CLOSING_DE = "Vielen Dank. Die Prüfung ist jetzt beendet.";

@@ -46,9 +46,16 @@ async function Writing({ params }: { params: PageProps<"/app/examenes/writing/[i
   const prompt = (
     <div className="space-y-4 rounded-2xl border bg-card p-5">
       <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-        Writing Task {config.part} · {data.minutes} minutos sugeridos
+        {data.sectionName} {data.partTitle} · {data.minutes} minutos sugeridos
       </p>
       <p className="whitespace-pre-line text-[15px] leading-relaxed">{task.prompt}</p>
+      {task.contentPoints?.length ? (
+        <ul className="list-disc space-y-1 pl-5 text-[15px]">
+          {task.contentPoints.map((p) => (
+            <li key={p}>{p}</li>
+          ))}
+        </ul>
+      ) : null}
       {task.chart ? (
         <div
           className="overflow-hidden rounded-xl border [&_svg]:h-auto [&_svg]:w-full"
@@ -65,7 +72,9 @@ async function Writing({ params }: { params: PageProps<"/app/examenes/writing/[i
         <Link href={`/app/examenes?examen=${attempt.exam}`} className="text-sm text-muted-foreground hover:text-foreground">
           ← Exámenes
         </Link>
-        <h1 className="mt-2 font-heading text-3xl font-extrabold tracking-tight">Writing · Task {config.part}</h1>
+        <h1 className="mt-2 font-heading text-3xl font-extrabold tracking-tight">
+          {data.sectionName} · {data.partTitle}
+        </h1>
       </div>
 
       {!submission && (
@@ -128,20 +137,28 @@ function Feedback(props: { band: number; feedback: WritingFeedback; text: string
     <div className="space-y-6">
       <section className="grid gap-4 md:grid-cols-[1fr_2fr]">
         <div className="rounded-3xl border bg-card p-6">
-          <p className="text-sm text-muted-foreground">Banda estimada</p>
-          <p className="mt-1 font-heading text-6xl font-extrabold tabular-nums">{props.band.toFixed(1)}</p>
+          <p className="text-sm text-muted-foreground">{f.scale ? "Nota estimada" : "Banda estimada"}</p>
+          <p className="mt-1 font-heading text-6xl font-extrabold tabular-nums">{f.scale ? f.scale.value : props.band.toFixed(1)}</p>
+          {f.scale?.pass !== undefined && (
+            <p className={cn("mt-1 inline-block rounded-full px-3 py-0.5 text-sm font-bold", f.scale.pass ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200")}>
+              {f.scale.pass ? "Aprobado" : "No aprobado"}
+            </p>
+          )}
           <p className="mt-2 text-sm text-muted-foreground">
-            MCER {ieltsToCefr(props.band)} · {props.words} palabras
+            {f.scale ? f.scale.label : `MCER ${ieltsToCefr(props.band)}`} · {props.words} palabras
             {props.words < props.minWords && <span className="text-amber-600"> (menos de {props.minWords})</span>}
           </p>
           <p className="mt-3 text-xs text-muted-foreground">Estimación de {f.graders} calificaciones independientes. No es una nota oficial.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">
-          {(Object.keys(CRITERIA_ES) as (keyof WritingFeedback["criteria"])[]).map((c) => (
+          {Object.keys(f.criteriaLabels ?? CRITERIA_ES).map((c) => (
             <div key={c} className="rounded-2xl border bg-card p-4">
               <div className="flex items-baseline justify-between gap-2">
-                <p className="text-sm font-semibold">{CRITERIA_ES[c]}</p>
-                <p className="font-heading text-2xl font-extrabold tabular-nums">{f.criteria[c].band}</p>
+                <p className="text-sm font-semibold">{(f.criteriaLabels ?? CRITERIA_ES)[c]}</p>
+                <p className="font-heading text-2xl font-extrabold tabular-nums">
+                  {f.criteria[c].band}
+                  {f.scale && <span className="text-sm font-normal text-muted-foreground">/5</span>}
+                </p>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">{f.criteria[c].commentEs}</p>
             </div>
@@ -191,11 +208,11 @@ function Feedback(props: { band: number; feedback: WritingFeedback; text: string
       </section>
 
       <details className="rounded-3xl border bg-card p-6" open>
-        <summary className="cursor-pointer font-semibold">Tu texto, una banda más arriba</summary>
+        <summary className="cursor-pointer font-semibold">Tu texto, un nivel más arriba</summary>
         <p className="mt-3 whitespace-pre-line text-[15px] leading-7">{f.improvedVersion}</p>
       </details>
       <details className="rounded-3xl border bg-card p-6">
-        <summary className="cursor-pointer font-semibold">Respuesta modelo (banda 8–9) y enunciado</summary>
+        <summary className="cursor-pointer font-semibold">Respuesta modelo y enunciado</summary>
         <div className="mt-4">{props.prompt}</div>
         <p className="mt-4 whitespace-pre-line text-[15px] leading-7">{f.modelAnswer}</p>
       </details>

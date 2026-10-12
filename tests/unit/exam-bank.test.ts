@@ -196,3 +196,24 @@ describe("dibujo SVG", () => {
     expect(niceScale(-5, 12).lo).toBeLessThan(0);
   });
 });
+
+describe("voces en aleman (pocas voces)", () => {
+  it("los hablantes tienen voces distintas aunque el narrador repita", () => {
+    process.env.ELEVENLABS_EXAM_VOICES_DE = "d1:Milly-F,d2:Simon-M,d3:Ellen-F";
+    process.env.ELEVENLABS_EXAMINER_DE = "d2";
+    const two = castVoices({ speakers: [{ id: "S1", name: "A", role: "r", gender: "F", accent: "ANY" }, { id: "S2", name: "B", role: "r", gender: "F", accent: "ANY" }] }, "de");
+    expect(two.NARRATOR.id).toBe("d2");
+    expect(new Set([two.S1.id, two.S2.id]).size).toBe(2);
+    const three = castVoices(
+      {
+        speakers: [
+          { id: "S1", name: "A", role: "r", gender: "F", accent: "ANY" },
+          { id: "S2", name: "B", role: "r", gender: "M", accent: "ANY" },
+          { id: "S3", name: "C", role: "r", gender: "F", accent: "ANY" },
+        ],
+      },
+      "de",
+    );
+    expect(new Set([three.S1.id, three.S2.id, three.S3.id]).size).toBe(3);
+  });
+});

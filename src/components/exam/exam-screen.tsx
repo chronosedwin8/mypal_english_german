@@ -41,7 +41,10 @@ export function ExamScreen({ view }: { view: PracticeView }) {
       view.blocks.flatMap((b) =>
         b.audio
           .filter((a) => b.questionNumbers.some((n) => n >= a.questionsFrom && n <= a.questionsTo))
-          .map((a) => ({ blockId: b.id, index: a.index, questionsFrom: a.questionsFrom, questionsTo: a.questionsTo, durationMs: a.durationMs })),
+          // Goethe: algunas grabaciones suenan dos veces seguidas.
+          .flatMap((a) =>
+            Array.from({ length: b.plays ?? 1 }, () => ({ blockId: b.id, index: a.index, questionsFrom: a.questionsFrom, questionsTo: a.questionsTo, durationMs: a.durationMs })),
+          ),
       ),
     [view.blocks],
   );
@@ -117,7 +120,7 @@ export function ExamScreen({ view }: { view: PracticeView }) {
             </p>
             <p className="font-heading text-lg font-bold">
               {view.sectionName}
-              {view.part ? ` · ${listening ? "Part" : "Passage"} ${view.part}` : ""}
+              {view.part ? ` · ${view.blocks[0]?.partTitle ?? view.part}` : ""}
               {view.taskType ? ` · ${TASK_TYPE_ES[view.taskType] ?? view.taskType}` : ""}
             </p>
           </div>
@@ -170,7 +173,7 @@ export function ExamScreen({ view }: { view: PracticeView }) {
               onClick={() => setActive(i)}
               className={cn("rounded-full px-4 py-1.5 text-sm font-semibold", active === i ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70")}
             >
-              Passage {b.part}
+              {b.partTitle}
             </button>
           ))}
         </div>
@@ -207,7 +210,7 @@ export function ExamScreen({ view }: { view: PracticeView }) {
         if (!content.passage)
           return (
             <section key={b.id} className="mb-10">
-              {listening && view.blocks.length > 1 && <h2 className="mb-4 font-heading text-xl font-bold">Part {b.part}</h2>}
+              {listening && view.blocks.length > 1 && <h2 className="mb-4 font-heading text-xl font-bold">{b.partTitle}</h2>}
               {questions}
             </section>
           );

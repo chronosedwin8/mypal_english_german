@@ -10,7 +10,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
 import { examSpec } from "@/content/exams";
-import { TOPIC_DOMAINS } from "@/content/exams/topics";
+import { TOPIC_DOMAINS, TOPIC_DOMAINS_DE } from "@/content/exams/topics";
 import type { ExamCode, ExamSectionCode } from "@/content/exams/types";
 import type { Prisma } from "@/generated/prisma/client";
 import { ai } from "@/server/ai";
@@ -20,13 +20,15 @@ import { countWords, isObjectiveCorrect, isOptionalWordsVariant, textContains } 
 import { enqueue } from "@/server/jobs/queue";
 
 import { synthesizeListening } from "./audio";
+import { GERMAN_TARGET_BAND } from "../profiles";
+
 import {
-  ITEM_WRITER_SYSTEM,
-  JUDGE_SYSTEM,
   PROMPT_VERSION,
   SOLVER_SYSTEM,
   generationPrompt,
+  itemWriterSystem,
   judgePrompt,
+  judgeSystem,
   repairPrompt,
   solverPrompt,
 } from "./prompts";
@@ -99,6 +101,7 @@ function sourceText(b: ObjectiveBlock): string {
 
 /** Banda objetivo con menos bloques en el inventario de esa parte. */
 async function pickBand(exam: ExamCode, section: ExamSectionCode, part: number): Promise<number> {
+  if (exam !== "IELTS_ACADEMIC") return GERMAN_TARGET_BAND[exam];
   const bands = (await getConfig())["exam.bank.targetBands"];
   const rows = await db.examItemSet.groupBy({
     by: ["difficulty"],
@@ -172,11 +175,11 @@ async function solve(block: ObjectiveBlock, refId: string) {
   return { agreement: questions.length ? correct / questions.length : 0, mismatches, issues, cost: res.costMicroUsd };
 }
 
-async function judge(block: AnyBlock, targetBand: number, partTitle: string, refId: string) {
+async function judge(exam: ExamCode, block: AnyBlock, targetBand: number, partTitle: string, refId: string) {
   const res = await ai().generateJson({
     purpose: "bank.judge",
     modelKey: "ai.model.judge",
-    system: JUDGE_SYSTEM,
+    system: judgeSystem(exam),
     prompt: judgePrompt(block, targetBand, partTitle),
     schema: JudgeSchema,
     temperature: 0.2,
@@ -185,17 +188,15 @@ async function judge(block: AnyBlock, targetBand: number, partTitle: string, ref
   return { verdict: res.data, cost: res.costMicroUsd };
 }
 
-function taskTypesOf(block: AnyBlock): string[] {
+function taskTypesOf(block: AnyBlock, partTaskTypes: string[]): string[] {
   if (isObjective(block)) return [...new Set(block.data.groups.map((g) => g.taskType))];
-  const map: Record<BankKind, string> = {
-    reading: "",
-    listening: "",
+  const map: Partial<Record<BankKind, string>> = {
     writing1: "GRAPH_REPORT",
     writing2: "ESSAY",
     speaking1: "SPEAKING_INTERVIEW",
     speaking2: "SPEAKING_LONG_TURN",
   };
-  return [map[block.kind]];
+  return map[block.kind] ? [map[block.kind]!] : partTaskTypes;
 }
 
 export async function produceBlock(input: ProduceInput): Promise<ProduceResult> {
@@ -206,9 +207,14 @@ export async function produceBlock(input: ProduceInput): Promise<ProduceResult> 
   const id = randomUUID();
 
   const targetBand = input.targetBand ?? (await pickBand(input.exam, input.section, input.part));
-  const domains = TOPIC_DOMAINS[kind];
+  const spec = examSpec(input.exam);
+  const domains = spec.language === "de" ? TOPIC_DOMAINS_DE[kind as keyof typeof TOPIC_DOMAINS_DE] : TOPIC_DOMAINS[kind as keyof typeof TOPIC_DOMAINS];
   const domain = input.domain ?? domains[Math.floor(Math.random() * domains.length)];
   const request = generationPrompt({
+    exam: input.exam,
+    examName: spec.name,
+    language: spec.language,
+    cefr: spec.cefr === "ALL" ? "B2–C1" : spec.cefr,
     kind,
     section,
     part,
@@ -222,7 +228,7 @@ export async function produceBlock(input: ProduceInput): Promise<ProduceResult> 
   const gen = await ai().generateJson({
     purpose: "bank.generate",
     modelKey: "ai.model.generate",
-    system: ITEM_WRITER_SYSTEM,
+    system: itemWriterSystem(input.exam),
     prompt: request,
     schema,
     temperature: 0.9,
@@ -244,7 +250,7 @@ export async function produceBlock(input: ProduceInput): Promise<ProduceResult> 
       if (s.agreement < config["exam.bank.solverMinAgreement"] || s.issues.length) issues.push(...s.issues);
     }
     if (!issues.length) {
-      const j = await judge(block, targetBand, part.title, id);
+      const j = await judge(input.exam, block, targetBand, part.title, id);
       cost += j.cost;
       verdict = j.verdict;
       qa.judge = j.verdict;
@@ -258,7 +264,7 @@ export async function produceBlock(input: ProduceInput): Promise<ProduceResult> 
     const fixed = await ai().generateJson({
       purpose: "bank.repair",
       modelKey: "ai.model.generate",
-      system: ITEM_WRITER_SYSTEM,
+      system: itemWriterSystem(input.exam),
       prompt: repairPrompt(block.data, issues, request),
       schema,
       temperature: 0.4,
@@ -276,7 +282,7 @@ export async function produceBlock(input: ProduceInput): Promise<ProduceResult> 
       exam: input.exam,
       section: input.section,
       part: input.part,
-      taskTypes: taskTypesOf(block),
+      taskTypes: taskTypesOf(block, part.taskTypes),
       difficulty: verdict?.estimatedBand ?? targetBand,
       topic: block.data.topic.slice(0, 120),
       content: content as Prisma.InputJsonValue,

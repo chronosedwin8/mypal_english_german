@@ -17,6 +17,7 @@ import type { StudySection } from "@/server/study/planner-core";
 
 import type { PublicGroup, QuestionKey } from "./bank/schemas";
 import { formItemSetIds } from "./forms";
+import { objectiveScale, type ScaleResult } from "./profiles";
 import { isObjectiveCorrect } from "./scoring/objective";
 
 export type PracticeMode = Extract<ExamMode, "DRILL" | "PART" | "SECTION">;
@@ -199,6 +200,10 @@ export interface PracticeView {
     content: Record<string, unknown> & { kind: string; groups: PublicGroup[] };
     questionNumbers: number[];
     audio: { index: number; durationMs: number; questionsFrom: number; questionsTo: number }[];
+    /** veces que suena el audio de este bloque (null = libre) */
+    plays: number | null;
+    /** "Part 1", "Passage 2", "Teil 3", "Aufgabe 4" */
+    partTitle: string;
   }[];
   answers: Record<string, Record<string, string>>;
 }
@@ -249,6 +254,8 @@ export async function loadPractice(attemptId: string, userId: string): Promise<P
           content,
           questionNumbers: config.questionNumbers[i.id] ?? [],
           audio: i.audio.map((a, index) => ({ index, durationMs: a.durationMs, ...segments[index] })),
+          plays: attempt.mode === "DRILL" ? null : (spec.parts.find((p) => p.part === i.part)?.plays ?? 1),
+          partTitle: spec.parts.find((p) => p.part === i.part)?.title ?? `Part ${i.part}`,
         };
       }),
     answers,
@@ -269,7 +276,8 @@ export async function audioUrl(attemptId: string, userId: string, itemSetId: str
 
   const done = attempt.status !== "IN_PROGRESS";
   if (!done && attempt.mode !== "DRILL") {
-    const allowed = sectionSpec(attempt.exam, config.section).parts[0]?.plays ?? 1;
+    const block = await db.examItemSet.findUnique({ where: { id: itemSetId }, select: { part: true } });
+    const allowed = sectionSpec(attempt.exam, config.section).parts.find((p) => p.part === block?.part)?.plays ?? 1;
     const key = `${itemSetId}:${index}`;
     // Conteo atomico: solo suma si no se paso del limite.
     const updated = await db.$executeRaw`
@@ -314,6 +322,8 @@ export interface PracticeScores {
   band: number | null;
   /** banda estimada con pocas preguntas (proporcional) */
   bandIsEstimate: boolean;
+  /** nota en la escala del examen (bandas IELTS, puntos Goethe, TDN TestDaF) */
+  scale?: ScaleResult | null;
   byTaskType: Record<string, { correct: number; total: number }>;
 }
 
@@ -354,10 +364,12 @@ export async function submitPractice(attemptId: string, userId: string): Promise
   }
 
   const table = config.section === "LISTENING" ? IELTS_LISTENING_TABLE : IELTS_READING_ACADEMIC_TABLE;
-  const full = attempt.mode === "SECTION" && total === 40;
+  const sectionTotal = sectionSpec(attempt.exam, config.section).rawMax;
+  const full = attempt.mode === "SECTION" && total === sectionTotal;
   // Con menos de 10 preguntas una banda no dice nada: solo se muestran los aciertos.
   const band = attempt.exam === "IELTS_ACADEMIC" && total >= 10 ?(full ? rawToBand(correct, table) : proportionalBand(correct, total, table)) : null;
-  const scores: PracticeScores = { correct, total, band, bandIsEstimate: !full, byTaskType };
+  const scale = objectiveScale(attempt.exam, config.section, correct, total, { full, cutoffs: (await getConfig())["exam.testdaf.cutoffs"] });
+  const scores: PracticeScores = { correct, total, band, bandIsEstimate: !full, byTaskType, scale };
 
   await db.$transaction(async (tx) => {
     // Compare-and-set: si otro envio gano la carrera, no se califica dos veces.

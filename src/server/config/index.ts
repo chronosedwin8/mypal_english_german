@@ -100,6 +100,8 @@ export const CONFIG_SCHEMA = {
   "exam.speaking.part3Questions": z.number().int().min(2).max(10).default(6),
   "exam.speaking.answerSeconds": z.number().int().min(15).max(180).default(60),
   "exam.speaking.longTurnSeconds": z.number().int().min(60).max(180).default(120),
+  /** Preparacion maxima en practica (el Goethe real da 15–20 min antes de la prueba oral). */
+  "exam.speaking.maxPrepSeconds": z.number().int().min(30).max(1200).default(180),
   /** Validez de las URLs prefirmadas de audio (segundos). */
   "exam.audioUrlSeconds": z.number().int().min(30).max(3600).default(300),
 

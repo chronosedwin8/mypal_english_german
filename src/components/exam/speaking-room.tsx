@@ -159,7 +159,7 @@ export function SpeakingRoom({ initial }: { initial: SpeakingState }) {
               state.current?.part === p.part ? "border-primary bg-primary text-primary-foreground" : p.status === "IN_PROGRESS" ? "bg-card" : "bg-muted text-muted-foreground",
             )}
           >
-            Part {p.part}
+            {p.title}
           </span>
         ))}
         <label className="ml-auto flex items-center gap-2 text-sm text-muted-foreground">

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 
-import { EXAM_CODES } from "@/content/exams";
+import { EXAMS, EXAM_CODES } from "@/content/exams";
 import { requireUser } from "@/server/auth/dal";
 import { db } from "@/server/db";
 import { QuotaError } from "@/server/exams/entitlements";
@@ -85,11 +85,11 @@ export async function submitPracticeAction(attemptId: string) {
 export async function startWritingAction(formData: FormData) {
   const user = await requireUser("/app/examenes");
   const input = z
-    .object({ exam: z.enum(EXAM_CODES as [string, ...string[]]), task: z.coerce.number().int().min(1).max(2), timed: z.string().optional() })
+    .object({ exam: z.enum(EXAM_CODES as [string, ...string[]]), task: z.coerce.number().int().min(1).max(3), timed: z.string().optional() })
     .parse(Object.fromEntries(formData));
   let attemptId: string;
   try {
-    ({ attemptId } = await startWriting(user, { exam: input.exam as never, task: input.task as 1 | 2, timed: input.timed === "on" }));
+    ({ attemptId } = await startWriting(user, { exam: input.exam as never, task: input.task, timed: input.timed === "on" }));
   } catch (err) {
     if (err instanceof WritingError) redirect(`/app/examenes?examen=${input.exam}&aviso=${encodeURIComponent(err.message)}`);
     throw err;
@@ -122,9 +122,11 @@ export async function submitWritingAction(attemptId: string, text: string): Prom
 export async function startSpeakingAction(formData: FormData) {
   const user = await requireUser("/app/examenes");
   const input = z
-    .object({ exam: z.enum(EXAM_CODES as [string, ...string[]]), parts: z.enum(["all", "1", "2", "3"]) })
+    .object({ exam: z.enum(EXAM_CODES as [string, ...string[]]), parts: z.union([z.literal("all"), z.string().regex(/^[1-9]$/)]) })
     .parse(Object.fromEntries(formData));
-  const parts: SpeakingPart[] = input.parts === "all" ? [1, 2, 3] : [Number(input.parts) as SpeakingPart];
+  const allParts = EXAMS[input.exam as keyof typeof EXAMS].sections.find((s) => s.section === "SPEAKING")!.parts.map((p) => p.part);
+  if (input.parts !== "all" && !allParts.includes(Number(input.parts))) throw new Error("Parte desconocida");
+  const parts: SpeakingPart[] = input.parts === "all" ? allParts : [Number(input.parts)];
   let attemptId: string;
   try {
     ({ attemptId } = await startSpeaking(user, { exam: input.exam as never, parts }));

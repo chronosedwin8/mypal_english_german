@@ -30,29 +30,33 @@ export function voicePool(language: ExamLanguage): CastVoice[] {
 export function castVoices(block: Pick<ListeningBlock, "speakers">, language: ExamLanguage): Record<string, CastVoice> {
   const pool = voicePool(language);
   if (!pool.length) throw new Error("No hay voces de examen configuradas");
-  const used = new Set<string>();
-  const cast: Record<string, CastVoice> = {};
   let narratorId: string | null = null;
   try {
     narratorId = examinerVoice(language);
   } catch {
     narratorId = null;
   }
-  const narrator = pool.find((v) => v.id === narratorId) ?? pool[0];
-  cast.NARRATOR = narrator;
-  used.add(narrator.id);
-
+  // Con pocas voces (aleman), los hablantes van primero: el narrador puede repetir voz.
+  const reserveNarrator = pool.length > block.speakers.length;
+  const used = new Set<string>(reserveNarrator && narratorId ? [narratorId] : []);
+  const cast: Record<string, CastVoice> = {};
   for (const s of block.speakers) {
     const free = pool.filter((v) => !used.has(v.id));
     const pick =
       free.find((v) => v.gender === s.gender && (s.accent === "ANY" || v.accent === s.accent)) ??
       free.find((v) => v.gender === s.gender) ??
       free[0] ??
-      pool.find((v) => v.gender === s.gender && v.id !== narrator.id) ??
+      pool.find((v) => v.gender === s.gender) ??
       pool[0];
     cast[s.id] = pick;
     used.add(pick.id);
   }
+  const speakerIds = new Set(Object.values(cast).map((v) => v.id));
+  cast.NARRATOR =
+    pool.find((v) => v.id === narratorId && (reserveNarrator || !speakerIds.has(v.id))) ??
+    pool.find((v) => !speakerIds.has(v.id)) ??
+    pool.find((v) => v.id === narratorId) ??
+    pool[0];
   return cast;
 }
 

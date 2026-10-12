@@ -132,6 +132,7 @@ describe("pipeline del banco", () => {
 describe("reposicion y formas", () => {
   it("encola lo que falta sin duplicar y el worker lo procesa", async () => {
     await setConfig("exam.bank.minPerPart", 1, null);
+    await setConfig("exam.enabledExams", ["IELTS_ACADEMIC"], null);
     expect(await planBankGaps({ maxJobs: 20 })).toBe(bankTargets("IELTS_ACADEMIC").length);
     expect(await planBankGaps({ maxJobs: 20 })).toBe(0); // ya estan en cola
 

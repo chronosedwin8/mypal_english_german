@@ -125,9 +125,10 @@ async function MockCard({ user, exam }: { user: { id: string; role: "STUDENT" | 
   return (
     <section className="relative overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/15 via-card to-card p-6">
       <p className="text-sm font-semibold uppercase tracking-wide text-primary">Simulacro completo</p>
-      <h2 className="mt-1 font-heading text-2xl font-extrabold">El examen entero, con nota en la escala oficial</h2>
+      <h2 className="mt-1 font-heading text-2xl font-extrabold">El examen entero, con nota en la escala oficial ({EXAMS[exam].scaleEs.toLowerCase()})</h2>
       <p className="mt-2 max-w-2xl text-muted-foreground">
-        Listening, Reading, Writing y Speaking con tiempos reales, audio una sola vez y un informe con tus fortalezas y qué practicar.
+        {EXAMS[exam].mockOrder.map((x) => EXAMS[exam].sections.find((y) => y.section === x)!.name).join(", ")} con tiempos reales, las reglas de audio del
+        examen y un informe con tus fortalezas y qué practicar.
       </p>
       <div className="mt-5 flex flex-wrap items-center gap-3">
         {open ? (
@@ -169,11 +170,12 @@ async function SpeakingCard({ user, exam }: { user: { id: string; role: "STUDENT
     }),
   ]);
   const recent = recentAll.filter((a) => !(a.config as { mockId?: string }).mockId).slice(0, 3);
+  const speakingSection = EXAMS[exam].sections.find((s) => s.section === "SPEAKING")!;
   return (
     <div className="flex gap-4 rounded-3xl border bg-card p-5">
       <MicIcon className="mt-1 size-5 shrink-0 text-primary" />
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">Speaking con examinador por voz</p>
+        <p className="font-semibold">{speakingSection.name} con examinador por voz</p>
         <p className="mt-1 text-sm text-muted-foreground">Las tres partes del examen, con tarjeta, tiempo real y nota por criterio.</p>
         {access.allowed ? (
           <form action={startSpeakingAction} className="mt-4 space-y-3">
@@ -182,14 +184,16 @@ async function SpeakingCard({ user, exam }: { user: { id: string; role: "STUDENT
               <Button type="submit" name="parts" value="all" size="sm">
                 Examen completo
               </Button>
-              {[1, 2, 3].map((p) => (
-                <Button key={p} type="submit" name="parts" value={String(p)} size="sm" variant="outline">
-                  Part {p}
+              {speakingSection.parts.map((p) => (
+                <Button key={p.part} type="submit" name="parts" value={String(p.part)} size="sm" variant="outline">
+                  {exam === "IELTS_ACADEMIC" ? `Part ${p.part}` : p.title}
                 </Button>
               ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              {access.unlimited ? "Administrador: sin límite." : `Te quedan ${quota.SPEAKING.available} partes este periodo. El examen completo usa 3.`}
+              {access.unlimited
+                ? "Administrador: sin límite."
+                : `Te quedan ${quota.SPEAKING.available} partes este periodo. El examen completo usa ${speakingSection.parts.length}.`}
             </p>
           </form>
         ) : (
@@ -205,9 +209,19 @@ async function SpeakingCard({ user, exam }: { user: { id: string; role: "STUDENT
             {recent.map((a) => (
               <li key={a.id}>
                 <Link href={`/app/examenes/speaking/${a.id}`} className="flex justify-between hover:underline">
-                  <span>{((a.config as { parts?: number[] }).parts ?? []).length === 3 ? "Examen completo" : `Part ${((a.config as { parts?: number[] }).parts ?? [])[0]}`}</span>
+                  <span>
+                    {((a.config as { parts?: number[] }).parts ?? []).length === speakingSection.parts.length
+                      ? "Examen completo"
+                      : (speakingSection.parts.find((p) => p.part === ((a.config as { parts?: number[] }).parts ?? [])[0])?.title ?? "Parte")}
+                  </span>
                   <span className="tabular-nums text-muted-foreground">
-                    {a.status === "COMPLETED" && a.overall !== null ? `banda ${a.overall.toFixed(1)}` : a.status === "IN_PROGRESS" ? "continuar" : "calificando…"}
+                    {a.status === "COMPLETED" && a.overall !== null
+                      ? exam === "IELTS_ACADEMIC"
+                        ? `banda ${a.overall.toFixed(1)}`
+                        : `${a.overall} ${exam === "TESTDAF" ? "/20" : "puntos"}`
+                      : a.status === "IN_PROGRESS"
+                        ? "continuar"
+                        : "calificando…"}
                   </span>
                 </Link>
               </li>
@@ -231,25 +245,26 @@ async function WritingCard({ user, exam }: { user: { id: string; role: "STUDENT"
     }),
   ]);
   const writing = writingAll.filter((w) => !(w.attempt.config as { mockId?: string }).mockId).slice(0, 3);
+  const writingSection = EXAMS[exam].sections.find((s) => s.section === "WRITING")!;
+  const writingParts = writingSection.parts;
   return (
     <div className="flex gap-4 rounded-3xl border bg-card p-5">
       <PenLineIcon className="mt-1 size-5 shrink-0 text-primary" />
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">Writing con corrección por IA</p>
+        <p className="font-semibold">{writingSection.name} con corrección por IA</p>
         <p className="mt-1 text-sm text-muted-foreground">Nota por criterio, errores marcados y tu texto una banda más arriba.</p>
         {access.allowed ? (
           <form action={startWritingAction} className="mt-4 space-y-3">
             <input type="hidden" name="exam" value={exam} />
             <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="timed" defaultChecked className="size-4 accent-primary" /> Con tiempo real (20 o 40 min)
+              <input type="checkbox" name="timed" defaultChecked className="size-4 accent-primary" /> Con el tiempo real del examen
             </label>
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" name="task" value="1" size="sm">
-                Task 1 · gráfico
-              </Button>
-              <Button type="submit" name="task" value="2" size="sm" variant="outline">
-                Task 2 · ensayo
-              </Button>
+              {writingParts.map((p, i) => (
+                <Button key={p.part} type="submit" name="task" value={String(p.part)} size="sm" variant={i === 0 ? "default" : "outline"}>
+                  {exam === "IELTS_ACADEMIC" ? (p.part === 1 ? "Task 1 · gráfico" : "Task 2 · ensayo") : `${p.title} · ${p.minutes} min`}
+                </Button>
+              ))}
             </div>
             <p className="text-xs text-muted-foreground">
               {access.unlimited ? "Administrador: sin límite." : `Te quedan ${quota.WRITING.available} correcciones este periodo.`}
@@ -268,9 +283,15 @@ async function WritingCard({ user, exam }: { user: { id: string; role: "STUDENT"
             {writing.map((w) => (
               <li key={w.attemptId}>
                 <Link href={`/app/examenes/writing/${w.attemptId}`} className="flex justify-between hover:underline">
-                  <span>Task {w.taskNumber}</span>
+                  <span>{writingParts.find((p) => p.part === w.taskNumber)?.title ?? `Task ${w.taskNumber}`}</span>
                   <span className="tabular-nums text-muted-foreground">
-                    {w.status === "GRADED" && w.finalScore !== null ? `banda ${w.finalScore.toFixed(1)}` : w.status === "PENDING" ? "calificando…" : "sin calificar"}
+                    {w.status === "GRADED" && w.finalScore !== null
+                      ? exam === "IELTS_ACADEMIC"
+                        ? `banda ${w.finalScore.toFixed(1)}`
+                        : `${w.finalScore} ${exam === "TESTDAF" ? "/20" : "puntos"}`
+                      : w.status === "PENDING"
+                        ? "calificando…"
+                        : "sin calificar"}
                   </span>
                 </Link>
               </li>
@@ -365,7 +386,7 @@ async function IeltsPractice({ user, exam }: { user: { id: string; role: "STUDEN
                       variant="outline"
                       disabled={!has(s.section, p.part)}
                     >
-                      {s.section === "LISTENING" ? "Part" : "Passage"} {p.part}
+                      {exam === "IELTS_ACADEMIC" ? `${s.section === "LISTENING" ? "Part" : "Passage"} ${p.part}` : p.title}
                     </StartButton>
                   ))}
                 </div>

@@ -58,7 +58,9 @@ async function Speaking({ params }: { params: PageProps<"/app/examenes/speaking/
 async function Result({ attemptId, userId }: { attemptId: string; userId: string }) {
   const { attempt, parts } = await loadSpeakingResult(attemptId, userId);
   const scoring = attempt.status === "SCORING";
-  const scores = attempt.scores as { band: number; criteria: Record<string, number> } | null;
+  const scores = attempt.scores as { band: number; criteria: Record<string, number>; scale?: { label: string; pass?: boolean; value: number } | null } | null;
+  const labels = parts.find((p) => p.feedback?.criteriaLabels)?.feedback?.criteriaLabels ?? CRITERIA_ES;
+  const german = attempt.exam !== "IELTS_ACADEMIC";
   return (
     <div className="space-y-6">
       {scoring && (
@@ -77,15 +79,23 @@ async function Result({ attemptId, userId }: { attemptId: string; userId: string
       {scores && attempt.status === "COMPLETED" && (
         <section className="grid gap-4 md:grid-cols-[1fr_2fr]">
           <div className="rounded-3xl border bg-card p-6">
-            <p className="text-sm text-muted-foreground">Banda estimada de Speaking</p>
-            <p className="mt-1 font-heading text-6xl font-extrabold tabular-nums">{scores.band.toFixed(1)}</p>
-            <p className="mt-2 text-sm text-muted-foreground">MCER {ieltsToCefr(scores.band)} · estimación, no oficial</p>
+            <p className="text-sm text-muted-foreground">{german ? "Nota estimada de Sprechen" : "Banda estimada de Speaking"}</p>
+            <p className="mt-1 font-heading text-6xl font-extrabold tabular-nums">{german && scores.scale ? scores.scale.value : scores.band.toFixed(1)}</p>
+            {scores.scale?.pass !== undefined && (
+              <p className={cn("mt-1 inline-block rounded-full px-3 py-0.5 text-sm font-bold", scores.scale.pass ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" : "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-200")}>
+                {scores.scale.pass ? "Aprobado" : "No aprobado"}
+              </p>
+            )}
+            <p className="mt-2 text-sm text-muted-foreground">{german && scores.scale ? scores.scale.label : `MCER ${ieltsToCefr(scores.band)}`} · estimación, no oficial</p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {Object.entries(CRITERIA_ES).map(([c, label]) => (
+            {Object.entries(labels).map(([c, label]) => (
               <div key={c} className="flex items-baseline justify-between rounded-2xl border bg-card p-4">
                 <p className="text-sm font-semibold">{label}</p>
-                <p className="font-heading text-2xl font-extrabold tabular-nums">{(scores.criteria[c] ?? 0).toFixed(1)}</p>
+                <p className="font-heading text-2xl font-extrabold tabular-nums">
+                  {(scores.criteria[c] ?? 0).toFixed(1)}
+                  {german && <span className="text-sm font-normal text-muted-foreground">/5</span>}
+                </p>
               </div>
             ))}
           </div>
@@ -95,15 +105,17 @@ async function Result({ attemptId, userId }: { attemptId: string; userId: string
       {parts.map((p) => (
         <section key={p.part} className="space-y-4 rounded-3xl border bg-card p-6">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="font-heading text-xl font-bold">Part {p.part}</h2>
-            {p.band !== null && <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-bold text-primary">banda {p.band.toFixed(1)}</span>}
+            <h2 className="font-heading text-xl font-bold">{p.title}</h2>
+            {p.band !== null && (
+              <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-bold text-primary">{p.feedback?.scale ? p.feedback.scale.label : `banda ${p.band.toFixed(1)}`}</span>
+            )}
           </div>
           {p.feedback && (
             <>
               <p className="text-muted-foreground">{p.feedback.overviewEs}</p>
               <div className="grid gap-3 sm:grid-cols-2">
-                {Object.entries(CRITERIA_ES).map(([c, label]) => {
-                  const v = p.feedback!.criteria[c as keyof typeof p.feedback.criteria];
+                {Object.entries(p.feedback.criteriaLabels ?? CRITERIA_ES).map(([c, label]) => {
+                  const v = p.feedback!.criteria[c];
                   return (
                     <div key={c} className="rounded-2xl bg-muted/40 p-3 text-sm">
                       <p className="font-semibold">

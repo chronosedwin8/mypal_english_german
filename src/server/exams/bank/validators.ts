@@ -50,6 +50,19 @@ export function validateBlock(block: AnyBlock, section: SectionSpec, part: PartS
       if (d.discussion.flatMap((x) => x.questions).some((q) => !q.trim().endsWith("?"))) issues.push('Every discussion question must end with "?".');
       return issues;
     }
+    case "writingTask": {
+      const d = block.data;
+      const issues: string[] = [];
+      if (part.minWords && countWords(d.modelAnswer) < part.minWords) issues.push(`modelAnswer must have at least ${part.minWords} words.`);
+      if (d.chart) issues.push(...validateChart(d.chart));
+      return issues;
+    }
+    case "speakingTask": {
+      const d = block.data;
+      const issues: string[] = [];
+      if ((d.mode === "discussion" || d.mode === "planning") && !d.partnerView) issues.push("A discussion or planning task needs partnerView.");
+      return issues;
+    }
   }
 }
 
@@ -222,7 +235,12 @@ function validateGroups(groups: QuestionGroup[], source: string, section: Sectio
         } else if (gaps !== 1) issues.push(`${tag}: completion items need exactly one gap "___".`);
         for (const a of q.answers)
           if (g.wordLimit && countWords(a) > g.wordLimit) issues.push(`${tag}: answer "${a}" exceeds the ${g.wordLimit}-word limit.`);
-        if (!textContains(source, q.answers[0]))
+        // En un texto con huecos (aleman, Lesen) la palabra se quito del texto: se exige el hueco numerado.
+        const gapText = g.taskType === "GAP_FILL" && section.section === "READING";
+        if (gapText) {
+          if (!new RegExp(`\\(${q.number - firstQuestionNumber(section, part.part) + 1}\\)|\\(${q.number}\\)`).test(source))
+            issues.push(`${tag}: the passage must contain the numbered gap (${q.number - firstQuestionNumber(section, part.part) + 1}).`);
+        } else if (!textContains(source, q.answers[0]))
           issues.push(`${tag}: the answer "${q.answers[0]}" must appear word for word in the ${section.section === "LISTENING" ? "transcript" : "passage"}.`);
       }
 

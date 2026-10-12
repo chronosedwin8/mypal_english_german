@@ -7,7 +7,7 @@ export type ExamSectionCode = "LISTENING" | "READING" | "WRITING" | "SPEAKING";
 export type ExamLanguage = "en" | "de";
 
 /** Tipo de bloque del banco (un texto, una grabacion, una tarea o una tarjeta). */
-export type BankKind = "reading" | "listening" | "writing1" | "writing2" | "speaking1" | "speaking2";
+export type BankKind = "reading" | "listening" | "writing1" | "writing2" | "speaking1" | "speaking2" | "writingTask" | "speakingTask";
 
 /** Tipos de pregunta que sabe generar y calificar el motor. */
 export type TaskType =

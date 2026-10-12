@@ -58,6 +58,7 @@ const LABELS: Partial<Record<ConfigKey, string>> = {
   "exam.speaking.part3Questions": "Speaking: preguntas de la Parte 3 (con repreguntas)",
   "exam.speaking.answerSeconds": "Speaking: segundos máximos por respuesta",
   "exam.speaking.longTurnSeconds": "Speaking: segundos máximos de la Parte 2",
+  "exam.speaking.maxPrepSeconds": "Speaking: preparación máxima en práctica (segundos)",
   "exam.freePractices": "Prácticas de examen gratis sin plan",
   "exam.adhoc.dailyPerUser": "Generaciones al momento por usuario y día",
   "exam.writing.task2Weight": "Peso de Writing Tarea 2 frente a Tarea 1",

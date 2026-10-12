@@ -8,8 +8,8 @@ import type { ExamCode, ExamSectionCode, PartSpec, SectionSpec } from "@/content
 
 import type { BankKind } from "./schemas";
 
-/** Examenes cuyo banco ya sabe generar el motor (el aleman llega en la fase 9). */
-export const BANK_EXAMS: ExamCode[] = ["IELTS_ACADEMIC"];
+/** Examenes cuyo banco sabe generar el motor. */
+export const BANK_EXAMS: ExamCode[] = ["IELTS_ACADEMIC", "GOETHE_B1", "GOETHE_B2", "GOETHE_C1", "TESTDAF"];
 
 export interface BankTarget {
   exam: ExamCode;
@@ -19,7 +19,11 @@ export interface BankTarget {
 }
 
 export function bankKind(exam: ExamCode, section: ExamSectionCode, part: number): BankKind | null {
-  if (exam !== "IELTS_ACADEMIC") return null;
+  if (exam !== "IELTS_ACADEMIC") {
+    // Aleman: cada parte es su propio bloque.
+    if (!examSpec(exam).sections.find((s) => s.section === section)?.parts.some((p) => p.part === part)) return null;
+    return section === "LISTENING" ? "listening" : section === "READING" ? "reading" : section === "WRITING" ? "writingTask" : "speakingTask";
+  }
   switch (section) {
     case "LISTENING":
       return "listening";

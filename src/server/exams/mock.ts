@@ -27,6 +27,11 @@ import { createMockWriting, submitWriting, type WritingFeedback } from "./writin
 
 export const MOCK_STAGES = ["LISTENING", "READING", "WRITING", "SPEAKING"] as const;
 export type MockStage = (typeof MOCK_STAGES)[number];
+
+/** Orden del simulacro de cada examen (Goethe empieza por Lesen). */
+export function stageOrder(exam: ExamCode): MockStage[] {
+  return examSpec(exam).mockOrder as MockStage[];
+}
 type StageStatus = "PENDING" | "ACTIVE" | "DONE" | "SKIPPED";
 
 export interface MockConfig {
@@ -117,9 +122,10 @@ export async function startMockStage(mockId: string, user: Pick<CurrentUser, "id
   const st = config.stages[stage];
   if (st.status === "ACTIVE") return stageUrl(mockId, stage, st.attemptIds);
   if (st.status !== "PENDING") throw new MockError("ORDER", "Esa sección ya está cerrada: en el examen no se puede volver atrás.");
-  const idx = MOCK_STAGES.indexOf(stage);
-  if (MOCK_STAGES.slice(0, idx).some((s) => config.stages[s].status === "PENDING" || config.stages[s].status === "ACTIVE"))
-    throw new MockError("ORDER", "Las secciones van en orden: Listening, Reading, Writing y Speaking.");
+  const order = stageOrder(mock.exam);
+  const idx = order.indexOf(stage);
+  if (order.slice(0, idx).some((s) => config.stages[s].status === "PENDING" || config.stages[s].status === "ACTIVE"))
+    throw new MockError("ORDER", `Las secciones van en orden: ${order.map((s) => sectionSpec(mock.exam, s).name).join(", ")}.`);
 
   const exam = mock.exam;
   let attemptIds: string[];
@@ -137,20 +143,24 @@ export async function startMockStage(mockId: string, user: Pick<CurrentUser, "id
       mockId,
     });
     attemptIds = [r.attemptId];
-    // El simulacro se descuenta al empezar el Listening.
-    if (stage === "LISTENING") await consumeQuota({ userId: user.id, kind: "MOCK", refId: mockId });
   } else if (stage === "WRITING") {
     const spec = sectionSpec(exam, "WRITING");
     const deadlineAt = new Date(Date.now() + spec.minutes * 60_000);
-    const [t1, t2] = sectionBlocks(blocks, "WRITING");
-    attemptIds = [
-      (await createMockWriting({ userId: user.id, exam, task: 1, itemSetId: t1, deadlineAt, mockId })).attemptId,
-      (await createMockWriting({ userId: user.id, exam, task: 2, itemSetId: t2, deadlineAt, mockId })).attemptId,
-    ];
+    const tasks = (blocks.sections.find((x) => x.section === "WRITING")?.parts ?? []).sort((a, b) => a.part - b.part);
+    attemptIds = [];
+    for (const t of tasks) attemptIds.push((await createMockWriting({ userId: user.id, exam, task: t.part, itemSetId: t.itemSetId, deadlineAt, mockId })).attemptId);
   } else {
-    const [p1, p2] = sectionBlocks(blocks, "SPEAKING");
-    attemptIds = [(await startSpeaking(user, { exam, parts: [1, 2, 3], mock: { mockId, p1, p2 } })).attemptId];
+    const speakingParts = (blocks.sections.find((x) => x.section === "SPEAKING")?.parts ?? []).sort((a, b) => a.part - b.part);
+    if (exam === "IELTS_ACADEMIC") {
+      const [p1, p2] = speakingParts.map((p) => p.itemSetId);
+      attemptIds = [(await startSpeaking(user, { exam, parts: [1, 2, 3], mock: { mockId, p1, p2 } })).attemptId];
+    } else {
+      const byPart = Object.fromEntries(speakingParts.map((p) => [String(p.part), p.itemSetId]));
+      attemptIds = [(await startSpeaking(user, { exam, parts: speakingParts.map((p) => p.part), mock: { mockId, byPart } })).attemptId];
+    }
   }
+  // El simulacro se descuenta al empezar su primera seccion.
+  if (idx === 0) await consumeQuota({ userId: user.id, kind: "MOCK", refId: mockId });
   config.stages[stage] = { status: "ACTIVE", attemptIds, startedAt: new Date().toISOString() };
   await saveConfig(mockId, config);
   return stageUrl(mockId, stage, attemptIds);
@@ -232,7 +242,19 @@ export async function syncOpenMocks(): Promise<number> {
 
 /* ───────────────────────── informe ───────────────────────── */
 
+export interface MockModule {
+  section: MockStage;
+  name: string;
+  value: number;
+  label: string;
+  pass?: boolean;
+}
+
 export interface MockScores {
+  /** aleman: un resultado por modulo/seccion en la escala del examen */
+  modules?: MockModule[];
+  /** Goethe: los cuatro modulos aprobados (equivale al certificado completo) */
+  certificate?: boolean;
   listening: { correct: number; total: number; band: number } | null;
   reading: { correct: number; total: number; band: number } | null;
   writing: { task1: number | null; task2: number | null; band: number } | null;
@@ -257,6 +279,52 @@ async function finalizeMock(mockId: string) {
 
   const cfg = await getConfig();
   const byId = (id?: string) => children.find((c) => c.id === id);
+  if (mock.exam !== "IELTS_ACADEMIC") {
+    const spec = examSpec(mock.exam);
+    const modules: MockModule[] = [];
+    for (const stage of stageOrder(mock.exam)) {
+      const st = config.stages[stage];
+      const name = sectionSpec(mock.exam, stage).name;
+      if (st.status === "SKIPPED") continue;
+      const kids = st.attemptIds.map((id) => byId(id)).filter(Boolean);
+      if (stage === "LISTENING" || stage === "READING") {
+        const sc = (kids[0]?.scores as unknown as PracticeScores | null)?.scale;
+        if (sc) modules.push({ section: stage, name, value: sc.value, label: sc.label, pass: sc.pass });
+      } else if (stage === "WRITING") {
+        // Puntos del modulo: tareas ponderadas por su tiempo, como en el examen.
+        const parts = sectionSpec(mock.exam, "WRITING").parts;
+        let sum = 0;
+        let weight = 0;
+        for (const k of kids) {
+          const sub = k!.writing[0];
+          const minutes = parts.find((p) => p.part === sub?.taskNumber)?.minutes ?? 1;
+          if (sub?.finalScore !== null && sub?.finalScore !== undefined) {
+            sum += sub.finalScore * minutes;
+            weight += minutes;
+          }
+        }
+        if (weight) {
+          const value = Math.round((sum / weight) * 10) / 10;
+          const pass = mock.exam === "TESTDAF" ? undefined : value >= 60;
+          modules.push({ section: stage, name, value, label: mock.exam === "TESTDAF" ? `${value}/20` : `${Math.round(value)} puntos`, pass });
+        }
+      } else {
+        const sc = (kids[0]?.scores as { scale?: { value: number; label: string; pass?: boolean } } | null)?.scale;
+        if (sc) modules.push({ section: stage, name, value: sc.value, label: sc.label, pass: sc.pass });
+      }
+    }
+    const scores: MockScores = {
+      modules,
+      certificate: mock.exam !== "TESTDAF" && modules.length === 4 && modules.every((m) => m.pass),
+      listening: null,
+      reading: null,
+      writing: null,
+      speaking: null,
+      overall: null,
+      cefr: spec.cefr === "ALL" ? null : spec.cefr,
+    };
+    return finishReport(mock, config, children, scores);
+  }
   const objective = (stage: "LISTENING" | "READING") => {
     const c = byId(config.stages[stage].attemptIds[0]);
     const sc = c?.scores as unknown as PracticeScores | null;
@@ -274,6 +342,20 @@ async function finalizeMock(mockId: string) {
   const overall =
     listening && reading && writing && speaking ? ieltsOverall({ listening: listening.band, reading: reading.band, writing: writing.band, speaking: speaking.band }) : null;
   const scores: MockScores = { listening, reading, writing, speaking, overall, cefr: overall !== null ? ieltsToCefr(overall) : null };
+  return finishReport(mock, config, children, scores);
+}
+
+type Child = Awaited<ReturnType<typeof db.examAttempt.findMany<{ include: { sections: true; writing: true; speaking: true } }>>>[number];
+
+async function finishReport(
+  mock: { id: string; userId: string; exam: ExamCode; user: { email: string; name: string } },
+  config: MockConfig,
+  children: Child[],
+  scores: MockScores,
+) {
+  const mockId = mock.id;
+  const byId = (id?: string) => children.find((c) => c.id === id);
+  const overall = scores.overall;
 
   // Fortalezas y debilidades por tipo de pregunta y por criterio.
   const typeStats: Record<string, { correct: number; total: number }> = {};
@@ -290,11 +372,11 @@ async function finalizeMock(mockId: string) {
     .sort((a, b) => b.rate - a.rate);
   const strengths = ranked.slice(0, 3);
   const weaknesses = [...ranked].reverse().slice(0, 3);
-  const writingCriteria = [w1, w2].flatMap((w) => {
+  const writingCriteria = config.stages.WRITING.attemptIds.map((id) => byId(id)).flatMap((w) => {
     const f = w?.writing[0]?.feedback as unknown as WritingFeedback | null;
     return f ? Object.entries(f.criteria).map(([c, v]) => ({ c, band: v.band })) : [];
   });
-  const timing = MOCK_STAGES.map((s) => {
+  const timing = stageOrder(mock.exam).map((s) => {
     const st = config.stages[s];
     const kids = st.attemptIds.map((id) => byId(id));
     return {
@@ -322,7 +404,7 @@ async function finalizeMock(mockId: string) {
       modelKey: "ai.model.judge",
       system:
         "Eres un tutor experto en IELTS que escribe para hispanohablantes. Redacta en español claro, con tildes, cálido y concreto. No inventes datos: usa solo los números dados. Recuerda que es una estimación, no una nota oficial.",
-      prompt: `Resultados del simulacro IELTS Academic: ${JSON.stringify(scores)}\nTipos de pregunta (aciertos/total): ${JSON.stringify(typeStats)}\nCriterios de Writing: ${JSON.stringify(writingCriteria)}\nTiempo y foco: ${JSON.stringify(timing)}\nEscribe narrativeEs (un párrafo de 4–6 oraciones) y 3–5 mejoras priorizadas (titleEs corto + detailEs con qué practicar en MyPAL).`,
+      prompt: `Resultados del simulacro ${examSpec(mock.exam).name}: ${JSON.stringify(scores)}\nTipos de pregunta (aciertos/total): ${JSON.stringify(typeStats)}\nCriterios de Writing: ${JSON.stringify(writingCriteria)}\nTiempo y foco: ${JSON.stringify(timing)}\nEscribe narrativeEs (un párrafo de 4–6 oraciones) y 3–5 mejoras priorizadas (titleEs corto + detailEs con qué practicar en MyPAL).`,
       schema: NarrativeSchema,
       temperature: 0.4,
       userId: mock.userId,
@@ -358,7 +440,8 @@ async function finalizeMock(mockId: string) {
   await addMockImprovements(mockId).catch((err) => console.error("[mock] plan de mejora", err));
 
   const url = `${process.env.APP_URL ?? "http://localhost:3000"}/app/examenes/simulacro/${mockId}`;
-  const band = overall !== null ? `banda ${overall.toFixed(1)}` : "tu informe por secciones";
+  const band =
+    overall !== null ? `banda ${overall.toFixed(1)}` : scores.modules?.length ? scores.modules.map((m) => `${m.name}: ${m.label}`).join(" · ") : "tu informe por secciones";
   await sendEmail(examReportEmail(mock.user.email, mock.user.name, examSpec(mock.exam).name, band, url)).catch(() => undefined);
 }
 
@@ -374,7 +457,7 @@ export async function mockView(mockId: string, userId: string) {
     config,
     report,
     scores: mock.scores as unknown as MockScores | null,
-    stages: MOCK_STAGES.map((s) => {
+    stages: stageOrder(mock.exam).map((s) => {
       const section = spec.sections.find((x) => x.section === s)!;
       const st = config.stages[s];
       return {

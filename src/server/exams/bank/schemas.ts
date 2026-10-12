@@ -199,13 +199,39 @@ export const SpeakingPart2Schema = z.object({
 export type SpeakingPart2 = z.infer<typeof SpeakingPart2Schema>;
 
 
+/** Tarea de escritura de los examenes de aleman (Goethe, TestDaF). */
+export const WritingTaskSchema = z.object({
+  topic: z.string().min(3).max(120),
+  targetBand: z.number().min(4).max(9),
+  register: z.enum(["formal", "informal", "neutral"]),
+  prompt: z.string().min(40).describe("Situation and instruction as printed in the exam, in the exam language"),
+  contentPoints: z.array(z.string().min(3)).min(2).max(4).describe("Points the text must cover (Inhaltspunkte)"),
+  chart: ChartSchema.nullable().describe("Only if the task is based on a graph, else null"),
+  modelAnswer: z.string().min(200),
+});
+export type WritingTask = z.infer<typeof WritingTaskSchema>;
+
+/** Tarea oral de los examenes de aleman: presentacion, discusion, planificacion o grabada (TestDaF). */
+export const SpeakingTaskSchema = z.object({
+  topic: z.string().min(3).max(120),
+  targetBand: z.number().min(4).max(9),
+  mode: z.enum(["presentation", "discussion", "planning", "recorded", "interview"]),
+  situation: z.string().min(20).describe("Task instructions shown to the candidate, in the exam language"),
+  points: z.array(z.string().min(2)).min(2).max(6).describe("Slides, guiding points or aspects to address"),
+  partnerView: z.string().nullable().describe("Opinion of the virtual partner in a discussion/planning task, else null"),
+  questions: z.array(z.string().min(5)).min(2).max(8).describe("Questions or reactions of the examiner/partner, in order"),
+});
+export type SpeakingTask = z.infer<typeof SpeakingTaskSchema>;
+
 export type AnyBlock =
   | { kind: "reading"; data: ReadingBlock }
   | { kind: "listening"; data: ListeningBlock }
   | { kind: "writing1"; data: WritingTask1 }
   | { kind: "writing2"; data: WritingTask2 }
   | { kind: "speaking1"; data: SpeakingPart1 }
-  | { kind: "speaking2"; data: SpeakingPart2 };
+  | { kind: "speaking2"; data: SpeakingPart2 }
+  | { kind: "writingTask"; data: WritingTask }
+  | { kind: "speakingTask"; data: SpeakingTask };
 
 export const SCHEMA_BY_KIND = {
   reading: ReadingBlockSchema,
@@ -214,6 +240,8 @@ export const SCHEMA_BY_KIND = {
   writing2: WritingTask2Schema,
   speaking1: SpeakingPart1Schema,
   speaking2: SpeakingPart2Schema,
+  writingTask: WritingTaskSchema,
+  speakingTask: SpeakingTaskSchema,
 } as const;
 
 /** Grupo sin clave (lo que ve la persona). */
@@ -300,6 +328,20 @@ export function splitBlock(block: AnyBlock): { content: Record<string, unknown>;
         content: { kind: "speaking2", card: block.data.card, roundingOff: block.data.roundingOff, discussion: block.data.discussion },
         answerKey: { kind: "speaking2" },
       };
+    case "writingTask": {
+      const d = block.data;
+      return {
+        content: { kind: "writingTask", prompt: d.prompt, register: d.register, contentPoints: d.contentPoints, chart: d.chart },
+        answerKey: { kind: "writingTask", keyIdeas: d.contentPoints, modelAnswer: d.modelAnswer },
+      };
+    }
+    case "speakingTask": {
+      const d = block.data;
+      return {
+        content: { kind: "speakingTask", mode: d.mode, situation: d.situation, points: d.points, partnerView: d.partnerView, questions: d.questions },
+        answerKey: { kind: "speakingTask" },
+      };
+    }
   }
 }
 

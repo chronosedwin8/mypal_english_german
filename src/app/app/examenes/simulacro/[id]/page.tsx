@@ -89,7 +89,11 @@ async function Mock({ params, searchParams }: { params: PageProps<"/app/examenes
         <section className="rounded-3xl border bg-card p-6">
           <p className="text-sm font-semibold uppercase tracking-wide text-primary">Siguiente sección</p>
           <h2 className="mt-1 font-heading text-2xl font-extrabold">{next.name}</h2>
-          <p className="mt-2 max-w-2xl text-muted-foreground">{RULES[next.stage]}</p>
+          <p className="mt-2 max-w-2xl text-muted-foreground">
+            {mock.exam === "IELTS_ACADEMIC"
+              ? RULES[next.stage]
+              : `${spec.sections.find((x) => x.section === next.stage)!.parts.length} partes en ${next.minutes} minutos.${next.stage === "LISTENING" ? " Cada audio suena las veces que fija el examen." : ""}${next.stage === "SPEAKING" ? " Puedes hacerlo ahora o más tarde." : ""}`}
+          </p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
             {next.status === "ACTIVE" && next.url ? (
               <Link href={next.url} className={buttonVariants()}>
@@ -126,7 +130,49 @@ async function Mock({ params, searchParams }: { params: PageProps<"/app/examenes
         </section>
       )}
 
-      {mock.status === "COMPLETED" && scores && report && (
+      {mock.status === "COMPLETED" && scores?.modules && report && (
+        <section className="space-y-6">
+          <div className="rounded-3xl border bg-gradient-to-br from-primary/10 to-card p-6">
+            <p className="text-sm text-muted-foreground">Resultado estimado por módulo</p>
+            {mock.exam !== "TESTDAF" && (
+              <p className="mt-1 font-heading text-2xl font-extrabold">
+                {scores.certificate ? "Los cuatro módulos aprobados: equivale al certificado completo" : "Aún no apruebas los cuatro módulos"}
+              </p>
+            )}
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {scores.modules.map((m) => (
+                <div key={m.section} className="rounded-2xl border bg-card p-4">
+                  <p className="font-semibold">{m.name}</p>
+                  <p className="font-heading text-3xl font-extrabold tabular-nums">{m.label}</p>
+                  {m.pass !== undefined && (
+                    <p className={cn("mt-1 text-xs font-bold", m.pass ? "text-emerald-600" : "text-rose-600")}>{m.pass ? "Aprobado" : "No aprobado"}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">Nota estimada, no oficial. La forma sigue en calibración.</p>
+          </div>
+          <div className="rounded-3xl border bg-card p-6">
+            <p className="font-semibold">Tu informe</p>
+            <p className="mt-2 leading-relaxed text-muted-foreground">{report.narrative}</p>
+            <ol className="mt-4 space-y-2">
+              {(report.improvements as { titleEs: string; detailEs: string }[]).map((m, i) => (
+                <li key={i} className="flex gap-3 text-sm">
+                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground">{i + 1}</span>
+                  <span>
+                    <b>{m.titleEs}.</b> {m.detailEs}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+          <Link href={`/app/examenes?examen=${mock.exam}`} className={buttonVariants({ variant: "outline" })}>
+            Volver a exámenes
+          </Link>
+        </section>
+      )}
+
+      {mock.status === "COMPLETED" && scores && !scores.modules && report && (
         <section className="space-y-6">
           <div className="grid gap-4 md:grid-cols-[1fr_2fr]">
             <div className="rounded-3xl border bg-gradient-to-br from-primary/10 to-card p-6">
