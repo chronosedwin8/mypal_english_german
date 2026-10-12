@@ -110,7 +110,7 @@ export async function startSession(input: StartInput): Promise<StartResult> {
       const buckets = await loadBuckets(tx, input.user.id);
       const paid = totalAvailable(eligibleBuckets(buckets, { isTrial: false, now }));
       const sub = await tx.subscription.findFirst({
-        where: { userId: input.user.id, status: { in: ["ACTIVE", "PAST_DUE"] } },
+        where: { userId: input.user.id, kind: "TUTOR", status: { in: ["ACTIVE", "PAST_DUE"] } },
         select: { planId: true },
       });
       const basePlanCap = sub ? (planById(sub.planId)?.perSessionCapSeconds ?? config["tavus.planMaxSessionSeconds"]) : config["tavus.planMaxSessionSeconds"];

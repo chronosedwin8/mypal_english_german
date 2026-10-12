@@ -7,16 +7,18 @@ import "dotenv/config";
 import { DE_ITEMS } from "@/content/diagnostic/de";
 import { EN_ITEMS } from "@/content/diagnostic/en";
 import { LEVEL_DIFFICULTY, type ItemDef } from "@/content/diagnostic/types";
-import { PLANS, TOPUPS } from "@/lib/pricing/catalog";
-import { worstCaseMargin } from "@/lib/pricing/margin";
+import { ALL_PLANS, EXAM_PRODUCTS, PLANS, TOPUPS, planKind } from "@/lib/pricing/catalog";
+import { examProductMargin, worstCaseMargin } from "@/lib/pricing/margin";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
 
 import { seedModules } from "./modules";
 
 async function seedPlans() {
-  for (const p of PLANS) {
-    const m = worstCaseMargin({ priceUsdCents: p.priceUsdCents, seconds: p.monthlySeconds, recurring: true });
+  for (const p of ALL_PLANS) {
+    const m = p.examQuotas
+      ? examProductMargin({ priceUsdCents: p.priceUsdCents, quotas: p.examQuotas, addon: p.kind === "EXAM_ADDON" })
+      : worstCaseMargin({ priceUsdCents: p.priceUsdCents, seconds: p.monthlySeconds, recurring: true });
     if (!m.meetsTarget) throw new Error(`El plan ${p.id} no cumple el margen minimo (${(m.margin * 100).toFixed(1)} %)`);
     const data = {
       nameEs: p.nameEs,
@@ -26,6 +28,8 @@ async function seedPlans() {
       highlight: p.highlight,
       sortOrder: p.sortOrder,
       features: p.features,
+      kind: planKind(p),
+      examQuotas: p.examQuotas ? { ...p.examQuotas } : undefined,
       isActive: true,
     };
     await db.plan.upsert({ where: { id: p.id }, create: { id: p.id, ...data }, update: data });
@@ -43,7 +47,7 @@ async function seedPlans() {
     };
     await db.topupPack.upsert({ where: { id: t.id }, create: { id: t.id, ...data }, update: data });
   }
-  console.log(`✔ ${PLANS.length} planes y ${TOPUPS.length} recargas`);
+  console.log(`✔ ${PLANS.length} planes con tutor, ${EXAM_PRODUCTS.length} productos de examen y ${TOPUPS.length} recargas`);
 }
 
 async function seedDiagnostic() {

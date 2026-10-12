@@ -2,7 +2,7 @@ import { CheckIcon, SparklesIcon } from "lucide-react";
 import Link from "next/link";
 
 import { buttonVariants } from "@/components/ui/button";
-import { PLANS, TOPUPS, formatUsd } from "@/lib/pricing/catalog";
+import { EXAM_PRODUCTS, PLANS, TOPUPS, formatUsd } from "@/lib/pricing/catalog";
 import { cn } from "@/lib/utils";
 
 /** Tarjetas de precios: claras y sin exceso de informacion. */
@@ -59,6 +59,31 @@ export function PricingCards({ ctaHref = "/registro" }: { ctaHref?: string }) {
       <p className="mt-8 text-center text-sm text-muted-foreground">
         ¿Necesitas más? Recargas desde {formatUsd(cheapestTopup)}. Precios en USD · Cancela cuando quieras.
       </p>
+      <div className="mt-12 rounded-3xl border bg-card p-6">
+        <p className="text-center font-heading text-lg font-bold">¿Te preparas para un examen?</p>
+        <p className="text-center text-sm text-muted-foreground">Práctica, plan de estudios y progreso ilimitados en todos los planes. Para simulacros y correcciones:</p>
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          {EXAM_PRODUCTS.map((p) => (
+            <Link
+              key={p.id}
+              href={`${ctaHref}?plan=${p.id}`}
+              className={cn("rounded-2xl border p-4 transition-colors hover:border-primary", p.highlight && "border-primary bg-primary/5")}
+            >
+              <p className="flex items-baseline justify-between gap-2">
+                <span className="font-semibold">{p.nameEs}</span>
+                <span className="font-heading text-xl font-extrabold">
+                  {formatUsd(p.priceUsdCents)}
+                  <span className="text-xs font-normal text-muted-foreground">/mes</span>
+                </span>
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {p.examQuotas!.MOCK} simulacros · {p.examQuotas!.WRITING} Writing · {p.examQuotas!.SPEAKING} Speaking
+                {p.kind === "EXAM_ADDON" ? " · complemento" : ""}
+              </p>
+            </Link>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

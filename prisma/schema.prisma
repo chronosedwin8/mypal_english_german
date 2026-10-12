@@ -271,6 +271,10 @@ model Plan {
   highlight            Boolean        @default(false)
   sortOrder            Int
   features             Json
+  /// TUTOR | EXAM | EXAM_ADDON
+  kind                 String         @default("TUTOR")
+  /// cupos de examen por ciclo: { MOCK, WRITING, SPEAKING }
+  examQuotas           Json?
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
   subscriptions        Subscription[]
@@ -298,6 +302,8 @@ model Subscription {
   /// fake | stripe | mercadopago | wompi
   provider           String
   externalId         String
+  /// TUTOR (minutos con avatar) | EXAM (plan o pase de examen): uno vivo de cada tipo
+  kind               String    @default("TUTOR")
   status             SubStatus
   currentPeriodStart DateTime
   currentPeriodEnd   DateTime
@@ -307,7 +313,7 @@ model Subscription {
   updatedAt          DateTime  @updatedAt
 
   @@unique([provider, externalId])
-  @@unique([userId], map: "one_live_subscription", where: raw("status = ANY (ARRAY['ACTIVE'::\"SubStatus\", 'PAST_DUE'::\"SubStatus\"])"))
+  @@unique([userId, kind], map: "one_live_subscription_per_kind", where: raw("status = ANY (ARRAY['ACTIVE'::\"SubStatus\", 'PAST_DUE'::\"SubStatus\"])"))
   @@index([userId, status])
 }
 

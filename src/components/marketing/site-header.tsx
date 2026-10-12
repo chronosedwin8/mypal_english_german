@@ -9,6 +9,7 @@ import { MobileNav } from "./mobile-nav";
 export const NAV_LINKS = [
   { href: "/#como-funciona", label: "Cómo funciona" },
   { href: "/#vision", label: "Tu tutor te ve" },
+  { href: "/#examenes", label: "Exámenes" },
   { href: "/#precios", label: "Precios" },
   { href: "/#preguntas", label: "Preguntas" },
 ] as const;

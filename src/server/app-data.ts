@@ -9,7 +9,7 @@ export async function accountSummary(userId: string) {
   const [balance, sub, trialClaim, diagnostics, profiles, openSession] = await Promise.all([
     getBalance(userId),
     db.subscription.findFirst({
-      where: { userId, status: { in: ["ACTIVE", "PAST_DUE"] } },
+      where: { userId, kind: "TUTOR", status: { in: ["ACTIVE", "PAST_DUE"] } },
       include: { plan: true },
     }),
     db.trialClaim.findUnique({ where: { userId } }),

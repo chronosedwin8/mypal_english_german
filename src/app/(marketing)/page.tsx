@@ -13,6 +13,7 @@ import Link from "next/link";
 import { AvatarLoop } from "@/components/avatar-loop";
 import { AccentPlayer } from "@/components/marketing/accent-player";
 import { ClassReplay } from "@/components/marketing/class-replay";
+import { ExamsSection } from "@/components/marketing/exams-section";
 import { Faq } from "@/components/marketing/faq";
 import { HeroLive } from "@/components/marketing/hero-live";
 import { KidsSection } from "@/components/marketing/kids-section";
@@ -28,6 +29,7 @@ const ASK = [
   "Explícame el present perfect con ejemplos",
   "Wie sagt man „Kühlschrank“ richtig?",
   "Simulemos el check-in en el aeropuerto",
+  "Hazme preguntas del IELTS Speaking Part 3",
   "Háblame más despacio, por favor",
   "Describe lo que ves en mi cuarto",
   "¿Cómo pido un café en Londres?",
@@ -104,6 +106,8 @@ export default function LandingPage() {
       </section>
 
       <KidsSection />
+
+      <ExamsSection />
 
       {/* Como funciona */}
       <section id="como-funciona" className="mx-auto max-w-6xl scroll-mt-20 px-4 py-24">

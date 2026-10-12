@@ -15,7 +15,10 @@ const Item = z.object({ kind: z.enum(["plan", "topup"]), itemId: z.string().min(
 export async function startCheckout(formData: FormData) {
   const user = await requireUser("/app/planes");
   const { kind, itemId } = Item.parse({ kind: formData.get("kind"), itemId: formData.get("itemId") });
-  if (kind === "plan" && !planById(itemId)) throw new Error("Plan desconocido");
+  const plan = kind === "plan" ? planById(itemId) : undefined;
+  if (kind === "plan" && !plan) throw new Error("Plan desconocido");
+  // El Pase de examen es un complemento de un plan con tutor.
+  if (plan?.kind === "EXAM_ADDON" && !(await hasActivePlan(user.id))) redirect("/app/planes?motivo=pase-sin-plan#examenes");
   if (kind === "topup") {
     if (!topupById(itemId)) throw new Error("Recarga desconocida");
     if (!(await hasActivePlan(user.id))) redirect("/app/planes?motivo=recarga-sin-plan");
@@ -35,9 +38,10 @@ export async function confirmFakePayment(formData: FormData) {
   redirect(`/app/planes?pagado=${parsed.kind}`);
 }
 
-export async function cancelSubscription() {
+export async function cancelSubscription(formData: FormData) {
   const user = await requireUser("/app/planes");
-  const sub = await db.subscription.findFirst({ where: { userId: user.id, status: { in: ["ACTIVE", "PAST_DUE"] } } });
+  const subscriptionId = z.string().min(1).parse(formData.get("subscriptionId"));
+  const sub = await db.subscription.findFirst({ where: { id: subscriptionId, userId: user.id, status: { in: ["ACTIVE", "PAST_DUE"] } } });
   if (!sub) redirect("/app/planes");
   await applyPaymentEvent({
     type: "SUBSCRIPTION_CANCEL_REQUESTED",

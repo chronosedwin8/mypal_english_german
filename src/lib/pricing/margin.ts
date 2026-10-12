@@ -157,3 +157,22 @@ export function cheapestTavusTier(minutes: number): TavusTier {
     (a, b) => tavusMonthlyCostCents(a, minutes) - tavusMonthlyCostCents(b, minutes),
   )[0];
 }
+
+/**
+ * Costo variable supuesto por unidad de examen, en centavos (con holgura sobre lo
+ * medido: Writing ≈ $0,05–0,10, Speaking ≈ $0,10, simulacro ≈ $0,60–0,70).
+ */
+export const EXAM_UNIT_COSTS_CENTS = { MOCK: 100, WRITING: 15, SPEAKING: 15 } as const;
+
+/** Margen de un producto de examen al 100 % de uso de sus cupos. Los complementos no pagan plataforma. */
+export function examProductMargin(
+  input: { priceUsdCents: number; quotas: { MOCK: number; WRITING: number; SPEAKING: number }; addon: boolean; tutorSeconds?: number },
+  costs: CostAssumptions = DEFAULT_COSTS,
+): MarginBreakdown & { examUsdCents: number } {
+  const base = worstCaseMargin({ priceUsdCents: input.priceUsdCents, seconds: input.tutorSeconds ?? 0, recurring: !input.addon }, costs);
+  const examUsdCents =
+    input.quotas.MOCK * EXAM_UNIT_COSTS_CENTS.MOCK + input.quotas.WRITING * EXAM_UNIT_COSTS_CENTS.WRITING + input.quotas.SPEAKING * EXAM_UNIT_COSTS_CENTS.SPEAKING;
+  const profitUsdCents = base.profitUsdCents - examUsdCents;
+  const margin = profitUsdCents / input.priceUsdCents;
+  return { ...base, examUsdCents, profitUsdCents, margin, meetsTarget: margin + 1e-9 >= costs.targetMargin };
+}

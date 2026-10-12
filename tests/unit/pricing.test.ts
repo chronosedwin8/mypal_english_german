@@ -1,13 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { PLANS, TOPUPS, TRIAL_SECONDS } from "@/lib/pricing/catalog";
-import {
-  DEFAULT_COSTS,
-  cheapestTavusTier,
-  maxMinutesForPrice,
-  minPriceForSeconds,
-  worstCaseMargin,
-} from "@/lib/pricing/margin";
+import { EXAM_PRODUCTS, PLANS, TOPUPS, TRIAL_SECONDS, subscriptionKind } from "@/lib/pricing/catalog";
+import { DEFAULT_COSTS, cheapestTavusTier, examProductMargin, maxMinutesForPrice, minPriceForSeconds, worstCaseMargin } from "@/lib/pricing/margin";
 
 describe("margen garantizado (peor caso: 100 % de los minutos usados)", () => {
   it.each(PLANS.map((p) => [p.id, p] as const))("plan %s cumple >= 60 %%", (_id, plan) => {
@@ -72,5 +66,22 @@ describe("recomendacion de plan Tavus", () => {
     expect(cheapestTavusTier(1200).id).toBe("growth");
     expect(cheapestTavusTier(3000).id).toBe("growth");
     expect(cheapestTavusTier(3300).id).toBe("business");
+  });
+});
+
+describe("productos de examen", () => {
+  it.each(EXAM_PRODUCTS.map((p) => [p.id, p] as const))("%s cumple >= 60 %% al 100 %% de uso de sus cupos", (_id, p) => {
+    const m = examProductMargin({ priceUsdCents: p.priceUsdCents, quotas: p.examQuotas!, addon: p.kind === "EXAM_ADDON" });
+    expect(m.meetsTarget).toBe(true);
+    expect(m.margin).toBeGreaterThanOrEqual(0.6);
+  });
+
+  it("el pase es complemento de un plan con tutor y no cobra plataforma", () => {
+    const pase = EXAM_PRODUCTS.find((p) => p.id === "pase-examen")!;
+    expect(subscriptionKind(pase)).toBe("EXAM");
+    const m = examProductMargin({ priceUsdCents: pase.priceUsdCents, quotas: pase.examQuotas!, addon: true });
+    expect(m.platformUsdCents).toBe(0);
+    expect(m.examUsdCents).toBe(410);
+    expect(m.margin).toBeCloseTo(0.647, 3);
   });
 });

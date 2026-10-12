@@ -51,16 +51,24 @@ async function event(
   return true;
 }
 
-export async function grantQuota(input: {
+export interface GrantInput {
   userId: string;
   kind: ExamQuotaKind;
   amount: number;
   periodStart: Date;
   periodEnd: Date;
   sourceKey: string;
-}) {
+}
+
+export async function grantQuota(input: GrantInput) {
   if (input.amount <= 0) return null;
-  return withTx(async (tx) => {
+  return withTx((tx) => grantQuotaTx(tx, input));
+}
+
+/** Igual que grantQuota pero dentro de una transaccion ya abierta (p. ej. al aplicar un pago). */
+export async function grantQuotaTx(tx: Tx, input: GrantInput) {
+  if (input.amount <= 0) return null;
+  {
     await lockUser(tx, input.userId);
     const existing = await tx.examEntitlement.findUnique({ where: { sourceKey: input.sourceKey } });
     if (existing) return existing;
@@ -76,7 +84,19 @@ export async function grantQuota(input: {
     });
     await event(tx, { entitlementId: ent.id, userId: input.userId, kind: input.kind, type: "GRANT", amount: input.amount, key: `grant:${input.sourceKey}` });
     return ent;
-  });
+  }
+}
+
+/** Reembolso: lo no usado de los cupos de un pago deja de estar disponible. */
+export async function revokeQuotasTx(tx: Tx, userId: string, sourcePrefix: string) {
+  await lockUser(tx, userId);
+  const ents = await tx.examEntitlement.findMany({ where: { userId, sourceKey: { startsWith: sourcePrefix } } });
+  for (const e of ents) {
+    const keep = e.used + e.reserved;
+    if (keep >= e.granted) continue;
+    await tx.examEntitlement.update({ where: { id: e.id }, data: { granted: keep } });
+    await event(tx, { entitlementId: e.id, userId, kind: e.kind, type: "REVOKE", amount: e.granted - keep, key: `revoke:${e.sourceKey}` });
+  }
 }
 
 export async function quotaSummary(userId: string, now = new Date()) {

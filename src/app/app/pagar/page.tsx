@@ -45,9 +45,11 @@ async function Checkout({ searchParams }: { searchParams: Promise<Record<string,
         <span className="rounded-full bg-sun/40 px-3 py-1 text-xs font-bold">MODO DE PRUEBA · sin cobro real</span>
         <h1 className="mt-4 font-heading text-2xl font-extrabold">Confirmar compra</h1>
         <div className="mt-6 rounded-2xl bg-muted/60 p-4">
-          <p className="font-semibold">{kind === "plan" ? `Plan ${item.nameEs}` : item.nameEs}</p>
+          <p className="font-semibold">{kind === "plan" && !("examQuotas" in item && item.examQuotas) ? `Plan ${item.nameEs}` : item.nameEs}</p>
           <p className="text-sm text-muted-foreground">
-            {formatMinutes(seconds)} con tu tutora {kind === "plan" ? "cada mes" : "· válida 90 días"}
+            {"examQuotas" in item && item.examQuotas
+              ? `${item.examQuotas.MOCK} simulacros, ${item.examQuotas.WRITING} correcciones de Writing y ${item.examQuotas.SPEAKING} partes de Speaking cada mes`
+              : `${formatMinutes(seconds)} con tu tutora ${kind === "plan" ? "cada mes" : "· válida 90 días"}`}
           </p>
           <p className="mt-3 font-heading text-3xl font-extrabold">
             {formatUsd(item.priceUsdCents)}

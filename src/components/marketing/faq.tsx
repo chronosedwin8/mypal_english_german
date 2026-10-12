@@ -28,6 +28,14 @@ const QUESTIONS = [
     a: "Sí. Cancelas en un clic y conservas tus minutos hasta el final del periodo que ya pagaste.",
   },
   {
+    q: "¿La nota de los simulacros es oficial?",
+    a: "No. Es una estimación con la escala oficial de cada examen (bandas de IELTS, puntos de Goethe, TDN de TestDaF). No estamos afiliados a IELTS, al Goethe-Institut ni a TestDaF. Si presentas el examen real, puedes registrar tu nota para que el simulador sea cada vez más preciso.",
+  },
+  {
+    q: "¿Qué examen me conviene?",
+    a: "IELTS Academic para universidades y trámites en países de habla inglesa; Goethe B1, B2 o C1 para estudiar, trabajar o la nacionalidad en países de habla alemana; TestDaF para universidades alemanas. Tu test de nivel gratis te sugiere por dónde empezar.",
+  },
+  {
     q: "¿Qué necesito para las clases?",
     a: "Un navegador moderno (Chrome, Edge o Safari), cámara y micrófono. Funciona en computador y en celular.",
   },
