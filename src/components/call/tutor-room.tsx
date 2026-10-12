@@ -19,7 +19,7 @@ import { toast } from "sonner";
 
 import { Turnstile } from "@/components/auth/turnstile";
 import { Flag, FLAG_BY_LANGUAGE } from "@/components/flag";
-import { TutorAvatar } from "@/components/marketing/tutor-avatar";
+import { AvatarLoop } from "@/components/avatar-loop";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -64,18 +64,22 @@ function deviceId(): string {
 
 export function TutorRoom({
   language,
+  audience = "ADULT",
   lessonId,
   lessonTitle,
   userName,
   resumeSessionId,
 }: {
   language: LanguageCode;
+  audience?: "ADULT" | "KIDS";
   lessonId: string | null;
   lessonTitle: string | null;
   userName: string;
   resumeSessionId: string | null;
 }) {
   const router = useRouter();
+  const kids = audience === "KIDS";
+  const tutorName = kids ? "Nuez" : "Poly";
   const [phase, setPhase] = useState<Phase>("preflight");
   const [session, setSession] = useState<SessionView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -197,7 +201,7 @@ export function TutorRoom({
         const res = await fetch("/api/sessions", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Idempotency-Key": idemKey.current },
-          body: JSON.stringify({ language, lessonId, queueEntryId, turnstileToken: token, deviceId: deviceId() }),
+          body: JSON.stringify({ language, audience, lessonId, queueEntryId, turnstileToken: token, deviceId: deviceId() }),
         });
         const data = await res.json();
         if (res.status === 409 && data?.error?.sessionId) {
@@ -227,7 +231,7 @@ export function TutorRoom({
         setPhase("preflight");
       }
     },
-    [language, lessonId, token, loadSession, preview, router],
+    [language, audience, lessonId, token, loadSession, preview, router],
   );
 
   // ---------- cola ----------
@@ -312,7 +316,7 @@ export function TutorRoom({
             </div>
           )}
           <span className="absolute left-4 top-4 rounded-full bg-black/50 px-3 py-1 text-xs font-medium text-white">
-            Así te verá tu tutora
+            Así te verá {tutorName}
           </span>
         </div>
         <div>
@@ -321,15 +325,17 @@ export function TutorRoom({
           </p>
           <h1 className="mt-2 font-heading text-3xl font-extrabold tracking-tight">{lessonTitle ?? "Conversación libre"}</h1>
           <ul className="mt-5 space-y-2 text-sm text-muted-foreground">
-            <li>🎧 Usa audífonos para que tu tutora te escuche mejor.</li>
+            {kids && <li>👨‍👩‍👧 Acompaña al niño durante toda la clase.</li>}
+            <li>🎧 Usa audífonos para que {tutorName} te escuche mejor.</li>
             <li>💡 Busca buena luz: así te ve mejor cuando le muestras objetos.</li>
             <li>⏱️ El tiempo cuenta desde que empieza la llamada.</li>
           </ul>
           <label className="mt-6 flex items-start gap-3 rounded-2xl border bg-card p-4 text-sm">
             <Checkbox checked={consent} onCheckedChange={(v) => setConsent(Boolean(v))} className="mt-0.5" />
             <span>
-              Acepto que mi tutora de IA vea mi cámara durante la clase para conversar sobre lo que le muestro. La clase no se
-              graba.
+              {kids
+                ? "Soy la madre, el padre o el tutor legal del niño, estaré presente durante la clase y autorizo que Nuez (una tutora de IA) vea la cámara para jugar con lo que le muestre. La clase no se graba."
+                : "Acepto que mi tutora de IA vea mi cámara durante la clase para conversar sobre lo que le muestro. La clase no se graba."}
             </span>
           </label>
           <div className="mt-4">
@@ -346,7 +352,7 @@ export function TutorRoom({
             onClick={() => start()}
           >
             {phase === "starting" ? <Loader2Icon className="animate-spin" /> : null}
-            {phase === "starting" ? "Conectando con tu tutora…" : "Empezar la clase"}
+            {phase === "starting" ? `Conectando con ${tutorName}…` : "Empezar la clase"}
           </Button>
         </div>
       </div>
@@ -356,10 +362,10 @@ export function TutorRoom({
   if (phase === "queued") {
     return (
       <div className="mx-auto max-w-md pt-10 text-center">
-        <div className="mx-auto size-40">
-          <TutorAvatar />
+        <div className="mx-auto size-40 overflow-hidden rounded-full">
+          <AvatarLoop who={kids ? "nuez" : "poly"} className="rounded-full" />
         </div>
-        <h1 className="mt-4 font-heading text-2xl font-extrabold">Todas las tutoras están en clase</h1>
+        <h1 className="mt-4 font-heading text-2xl font-extrabold">{tutorName} está con otros estudiantes</h1>
         <p className="mt-2 text-muted-foreground">
           Estás en el puesto <strong className="text-foreground">{queue?.position ?? "…"}</strong> de la fila. Mantén esta
           pestaña abierta: entrarás automáticamente.
@@ -406,9 +412,8 @@ export function TutorRoom({
             }}
           />
         ) : (
-          <div className="absolute inset-x-0 bottom-0 top-8 mx-auto w-[min(80%,420px)]">
-            <TutorAvatar speaking={call.tutorSpeaking} />
-          </div>
+          // Mientras conecta (o en modo simulado) se ve el avatar real en bucle.
+          <AvatarLoop who={kids ? "nuez" : "poly"} className="absolute inset-0 h-full w-full" />
         )}
         {call.tutorAudio && (
           <audio
@@ -469,7 +474,7 @@ export function TutorRoom({
           <div className="absolute inset-0 grid place-items-center bg-black/40 text-white">
             <div className="text-center">
               <Loader2Icon className="mx-auto size-8 animate-spin" />
-              <p className="mt-3 text-sm">Tu tutora se está conectando…</p>
+              <p className="mt-3 text-sm">{tutorName} se está conectando…</p>
             </div>
           </div>
         )}

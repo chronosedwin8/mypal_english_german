@@ -38,6 +38,9 @@ export const CONFIG_SCHEMA = {
   "session.wrapUpSecondsBefore": z.number().int().min(10).max(180).default(60),
   "session.trialWrapUpSecondsBefore": z.number().int().min(10).max(120).default(30),
 
+  /** Niños: clases mas cortas (atencion) */
+  "kids.maxSessionSeconds": z.number().int().min(120).max(1800).default(10 * 60),
+
   /** Cola */
   "queue.offerSeconds": z.number().int().min(15).max(300).default(45),
 

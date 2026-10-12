@@ -22,6 +22,11 @@ export default function TermsPage() {
         Debes ser mayor de 18 años y dar un correo válido. Eres responsable de tu contraseña y del uso de tu cuenta. Una
         persona puede tener una sola cuenta.
       </p>
+      <p>
+        <strong>Modo niños (Nuez):</strong> el titular de la cuenta puede usar sus minutos en clases para niños de 5 a 12
+        años. Al iniciar cada clase declara ser su madre, padre o tutor legal, autoriza el uso de la cámara y se compromete a
+        acompañar al niño durante toda la clase.
+      </p>
 
       <h2>2. Prueba gratis</h2>
       <p>

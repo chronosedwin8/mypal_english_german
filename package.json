@@ -24,10 +24,18 @@
     "admin:promote": "tsx scripts/promote-admin.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1149.0",
+    "@aws-sdk/s3-request-presigner": "^3.1149.0",
     "@base-ui/react": "^1.9.0",
     "@daily-co/daily-js": "^0.93.0",
+    "@google/genai": "^2.28.0",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
+    "@tensorflow-models/coco-ssd": "2.2.3",
+    "@tensorflow/tfjs-backend-cpu": "4.22.0",
+    "@tensorflow/tfjs-backend-webgl": "4.22.0",
+    "@tensorflow/tfjs-converter": "4.22.0",
+    "@tensorflow/tfjs-core": "4.22.0",
     "better-auth": "1.7.7",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",

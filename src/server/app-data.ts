@@ -42,10 +42,10 @@ export async function recentSessions(userId: string, take = 5) {
   });
 }
 
-export async function lessonsFor(language: TargetLang) {
+export async function lessonsFor(language: TargetLang, audience: "ADULT" | "KIDS" = "ADULT") {
   const lang = language === "DE" ? "DE" : "EN";
   return db.module.findMany({
-    where: { lang, isPublished: true },
+    where: { lang, audience, isPublished: true },
     orderBy: [{ sortOrder: "asc" }],
     include: { lessons: { orderBy: { sortOrder: "asc" } } },
   });

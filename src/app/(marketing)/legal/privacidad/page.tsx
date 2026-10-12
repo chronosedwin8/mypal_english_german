@@ -52,7 +52,11 @@ export default function PrivacyPage() {
       </p>
 
       <h2>Menores de edad</h2>
-      <p>El servicio es solo para mayores de 18 años.</p>
+      <p>
+        Las cuentas son solo para mayores de 18 años. En el modo niños, el titular de la cuenta autoriza cada clase y está
+        presente. En esas clases no pedimos ni guardamos el nombre ni otros datos personales del niño, no grabamos el video y
+        la tutora está instruida para no solicitar información personal.
+      </p>
 
       <h2>Conservación</h2>
       <p>

@@ -2,13 +2,20 @@
  * Contexto que recibe el tutor en cada clase (conversational_context) y saludo.
  * Va en ingles porque es para el LLM; el saludo va en el idioma meta.
  */
-import type { Cefr, TargetLang } from "@/generated/prisma/client";
+import type { Audience, Cefr, TargetLang } from "@/generated/prisma/client";
 import { db } from "@/server/db";
 
 const GREETING: Record<TargetLang, (name: string) => string> = {
   EN_US: (n) => `Hi ${n}! I'm Poly, your English tutor. How are you doing today?`,
   EN_GB: (n) => `Hello ${n}! I'm Poly, your English tutor. How are you today?`,
   DE: (n) => `Hallo ${n}! Ich bin Poly, deine Deutschlehrerin. Wie geht's dir heute?`,
+};
+
+/** Sin el nombre del niño: no usamos datos personales con menores. */
+const KIDS_GREETING: Record<TargetLang, string> = {
+  EN_US: "Hi there! I'm Nuez, the squirrel! Do you want to play a game with me?",
+  EN_GB: "Hello there! I'm Nuez, the squirrel! Shall we play a game?",
+  DE: "Hallo! Ich bin Nuez, das Eichhörnchen! Spielen wir zusammen?",
 };
 
 const TRIAL_GREETING: Record<TargetLang, (name: string) => string> = {
@@ -35,11 +42,13 @@ export async function buildContext(input: {
   userId: string;
   userName: string;
   language: TargetLang;
+  audience?: Audience;
   level: Cefr | null;
   lessonId: string | null;
   isTrial: boolean;
   maxCallSeconds: number;
 }): Promise<{ context: string; greeting: string; languages: string[] }> {
+  if (input.audience === "KIDS") return buildKidsContext(input);
   const name = firstName(input.userName);
   const minutes = Math.max(1, Math.round(input.maxCallSeconds / 60));
   const [lesson, dueWords, corrections, lastTranscript] = await Promise.all([
@@ -92,5 +101,33 @@ export async function buildContext(input: {
     context: lines.join("\n"),
     greeting: (input.isTrial ? TRIAL_GREETING : GREETING)[input.language](name),
     languages: conversationLanguages(input.language, input.level),
+  };
+}
+
+/** Contexto de las clases de niños: sin nombre completo ni datos personales. */
+async function buildKidsContext(input: {
+  userId: string;
+  language: TargetLang;
+  lessonId: string | null;
+  maxCallSeconds: number;
+}) {
+  const minutes = Math.max(1, Math.round(input.maxCallSeconds / 60));
+  const lesson = input.lessonId ? await db.lesson.findUnique({ where: { id: input.lessonId } }) : null;
+  const lines = [
+    "Audience: a Spanish-speaking child (about 5 to 12 years old) with a parent nearby. Treat them as a beginner.",
+    `This class lasts about ${minutes} minutes; it will end automatically.`,
+    "Do not ask for the child's name or any personal information. Call them 'friend' (or 'Freund/Freundin' in German).",
+  ];
+  if (lesson) {
+    lines.push(`Lesson: "${lesson.titleEs}". Goal for the tutor: ${lesson.tutorBrief}`);
+    if (lesson.targetVocab.length) lines.push(`Target words: ${lesson.targetVocab.join(", ")}.`);
+  } else {
+    lines.push("Free play: start with an 'I spy' game using objects you can see in the child's camera.");
+  }
+  const greeting = KIDS_GREETING[input.language];
+  return {
+    context: lines.join("\n"),
+    greeting,
+    languages: [targetCode(input.language), "es"],
   };
 }

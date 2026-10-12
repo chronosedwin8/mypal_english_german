@@ -21,8 +21,9 @@ async function Room({ searchParams }: { searchParams: Promise<Record<string, str
   const sp = await searchParams;
   const open = await db.tutorSession.findFirst({
     where: { userId: user.id, status: { in: ["READY", "LIVE"] } },
-    select: { id: true, language: true, lessonId: true },
+    select: { id: true, language: true, lessonId: true, audience: true },
   });
+  const audience = open?.audience ?? (sp.modo === "ninos" ? "KIDS" : "ADULT");
   const language: LanguageCode =
     (open?.language as LanguageCode | undefined) ?? (typeof sp.idioma === "string" && isLanguageCode(sp.idioma) ? sp.idioma : "EN_US");
   const lessonId = open?.lessonId ?? (typeof sp.leccion === "string" ? sp.leccion : null);
@@ -32,6 +33,7 @@ async function Room({ searchParams }: { searchParams: Promise<Record<string, str
     <div className="pb-16 md:pb-0">
       <TutorRoom
         language={language}
+        audience={audience}
         lessonId={lesson?.id ?? null}
         lessonTitle={lesson?.titleEs ?? null}
         userName={user.name.split(" ")[0]}

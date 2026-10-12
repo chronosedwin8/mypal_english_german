@@ -13,7 +13,7 @@
  */
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
-import type { Cefr, EndReason, SessionStatus, TargetLang } from "@/generated/prisma/client";
+import type { Audience, Cefr, EndReason, SessionStatus, TargetLang } from "@/generated/prisma/client";
 import { planById } from "@/lib/pricing/catalog";
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
@@ -55,6 +55,7 @@ export function verifySessionSignature(sessionId: string, purpose: "webhook" | "
 export interface StartInput {
   user: { id: string; name: string; email: string; emailVerified: boolean };
   language: TargetLang;
+  audience?: Audience;
   lessonId: string | null;
   clientRequestId: string;
   queueEntryId: string | null;
@@ -73,7 +74,9 @@ export async function startSession(input: StartInput): Promise<StartResult> {
   if (config["tavus.killSwitch"]) {
     throw new SessionError("SERVICE_PAUSED", "Las clases están en pausa por mantenimiento. Vuelve en unos minutos.");
   }
-  const pal = await db.tavusPal.findUnique({ where: { variant: input.language } });
+  const audience: Audience = input.audience ?? "ADULT";
+  const kids = audience === "KIDS";
+  const pal = await db.tavusPal.findUnique({ where: { variant_audience: { variant: input.language, audience } } });
   if (!pal) throw new SessionError("NOT_CONFIGURED", "El tutor de este idioma aún no está configurado (pnpm tavus:setup).");
 
   const profile = await db.languageProfile.findUnique({
@@ -110,7 +113,8 @@ export async function startSession(input: StartInput): Promise<StartResult> {
         where: { userId: input.user.id, status: { in: ["ACTIVE", "PAST_DUE"] } },
         select: { planId: true },
       });
-      const planCap = sub ? (planById(sub.planId)?.perSessionCapSeconds ?? config["tavus.planMaxSessionSeconds"]) : config["tavus.planMaxSessionSeconds"];
+      const basePlanCap = sub ? (planById(sub.planId)?.perSessionCapSeconds ?? config["tavus.planMaxSessionSeconds"]) : config["tavus.planMaxSessionSeconds"];
+      const planCap = kids ? Math.min(basePlanCap, config["kids.maxSessionSeconds"]) : basePlanCap;
       const common = {
         tavusPlanMaxSeconds: config["tavus.planMaxSessionSeconds"],
         safetyMarginSeconds: config["session.safetyMarginSeconds"],
@@ -135,7 +139,7 @@ export async function startSession(input: StartInput): Promise<StartResult> {
               deviceId: input.trial.deviceId,
               ipPrefixHash: input.trial.ipPrefixHash,
             },
-            config,
+            kids ? { ...config, "trial.requireDiagnostic": false } : config,
             now,
           );
           trialAvail = totalAvailable(eligibleBuckets(await loadBuckets(tx, input.user.id), { isTrial: true, now }));
@@ -162,6 +166,7 @@ export async function startSession(input: StartInput): Promise<StartResult> {
           id: sessionId,
           userId: input.user.id,
           language: input.language,
+          audience,
           lessonId: lesson?.id ?? null,
           isTrial,
           testMode,
@@ -203,8 +208,9 @@ export async function startSession(input: StartInput): Promise<StartResult> {
   await createConversation(sessionId, {
     user: input.user,
     language: input.language,
-    level: profile?.level ?? null,
-    memoryTag: profile?.memoryTag ?? null,
+    audience,
+    level: kids ? null : (profile?.level ?? null),
+    memoryTag: profile?.memoryTag ? (kids ? `${profile.memoryTag}_kids` : profile.memoryTag) : null,
     lessonId: lesson?.id ?? null,
     isTrial: reserved.isTrial,
     maxCallSeconds: reserved.maxCallDurationSeconds,
@@ -360,6 +366,7 @@ async function createConversation(
   input: {
     user: { id: string; name: string };
     language: TargetLang;
+    audience: Audience;
     level: Cefr | null;
     memoryTag: string | null;
     lessonId: string | null;
@@ -380,6 +387,7 @@ async function createConversation(
     userId: input.user.id,
     userName: input.user.name,
     language: input.language,
+    audience: input.audience,
     level: input.level,
     lessonId: input.lessonId,
     isTrial: input.isTrial,

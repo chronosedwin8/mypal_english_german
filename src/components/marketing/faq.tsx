@@ -16,6 +16,10 @@ const QUESTIONS = [
     a: "Durante la clase, el tutor puede ver lo que le muestras para conversar sobre ello (un objeto, tu cuarto, un texto). No grabamos tus clases y la cámara solo se usa mientras estás en la llamada.",
   },
   {
+    q: "¿Mis hijos pueden usarlo?",
+    a: "Sí, con Nuez, la ardilla tutora para niños de 5 a 12 años. Se usa desde tu cuenta, siempre con un adulto presente; no pide datos personales y no graba.",
+  },
+  {
     q: "¿Qué nivel necesito?",
     a: "Desde cero (A1) hasta avanzado (C1). El test de nivel gratis te ubica y el tutor adapta su forma de hablar a ti.",
   },

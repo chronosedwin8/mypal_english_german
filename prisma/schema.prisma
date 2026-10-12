@@ -27,6 +27,12 @@ enum TargetLang {
   DE
 }
 
+/// Publico: adultos (Poly) o niños (Nuez, la ardilla). Cada uno tiene sus propios tutores.
+enum Audience {
+  ADULT
+  KIDS
+}
+
 /// Idioma base para contenido compartido (EN_US y EN_GB comparten banco de preguntas).
 enum BaseLang {
   EN
@@ -417,6 +423,7 @@ model TutorSession {
   userId              String
   user                User                @relation(fields: [userId], references: [id], onDelete: Cascade)
   language            TargetLang
+  audience            Audience            @default(ADULT)
   lessonId            String?
   isTrial             Boolean             @default(false)
   testMode            Boolean             @default(false)
@@ -649,6 +656,7 @@ model SpeakingSample {
 model Module {
   id            String   @id
   lang          BaseLang
+  audience      Audience @default(ADULT)
   level         Cefr
   slug          String
   titleEs       String
@@ -710,7 +718,8 @@ model TrialClaim {
 }
 
 model TavusPal {
-  variant        TargetLang @id
+  variant        TargetLang
+  audience       Audience   @default(ADULT)
   palId          String     @unique
   faceId         String
   basePalId      String
@@ -718,6 +727,8 @@ model TavusPal {
   specHash       String
   lastSyncedAt   DateTime
   lastVerifiedAt DateTime?
+
+  @@id([variant, audience])
 }
 
 model AppConfig {

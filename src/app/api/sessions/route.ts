@@ -11,6 +11,7 @@ import { toHttp } from "./_shared";
 
 const Body = z.object({
   language: z.enum(["EN_US", "EN_GB", "DE"]),
+  audience: z.enum(["ADULT", "KIDS"]).default("ADULT"),
   lessonId: z.string().max(120).nullish(),
   queueEntryId: z.string().uuid().nullish(),
   turnstileToken: z.string().max(4096).nullish(),
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
     const result = await startSession({
       user,
       language: body.language,
+      audience: body.audience,
       lessonId: body.lessonId ?? null,
       clientRequestId: idem,
       queueEntryId: body.queueEntryId ?? null,

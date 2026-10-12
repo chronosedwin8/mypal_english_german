@@ -1,5 +1,5 @@
 import { Logo } from "@/components/marketing/logo";
-import { TutorAvatar } from "@/components/marketing/tutor-avatar";
+import { AvatarLoop } from "@/components/avatar-loop";
 
 export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
@@ -12,12 +12,12 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
       </div>
       <aside className="relative hidden overflow-hidden bg-gradient-to-br from-primary via-[oklch(0.5_0.22_310)] to-coral lg:flex lg:flex-col lg:items-center lg:justify-center">
         <div className="absolute inset-0 bg-grid opacity-20" />
-        <div className="relative size-80">
-          <TutorAvatar speaking />
+        <div className="relative size-80 overflow-hidden rounded-full border-8 border-white/20 shadow-2xl">
+          <AvatarLoop who="poly" />
         </div>
         <blockquote className="relative mt-6 max-w-sm rounded-3xl bg-white/95 p-6 text-center text-[#22183d] shadow-2xl">
           <p className="font-heading text-xl font-bold">“Hi! Ready to chat?”</p>
-          <p className="mt-2 text-sm text-[#5b4f7a]">Tu tutora te espera. Primero, crea tu cuenta.</p>
+          <p className="mt-2 text-sm text-[#5b4f7a]">Soy Poly, tu tutora. Primero, crea tu cuenta.</p>
         </blockquote>
       </aside>
     </div>

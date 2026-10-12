@@ -14,7 +14,7 @@ import { db } from "@/server/db";
 import type { TavusPalRecord } from "@/server/tavus";
 import { FakeTavusClient } from "@/server/tavus/fake-client";
 import { HttpTavusClient } from "@/server/tavus/http-client";
-import { TUTOR_VARIANTS, buildPalSpec, palName, specHash } from "@/server/tavus/pal-spec";
+import { TUTOR_AUDIENCES, TUTOR_VARIANTS, buildPalSpec, kidsFaceId, palName, specHash } from "@/server/tavus/pal-spec";
 import { TUTOR_TOOLS } from "@/server/tavus/prompts";
 
 const dryRun = process.argv.includes("--dry-run");
@@ -71,44 +71,51 @@ async function main() {
     console.log(`  ✔ herramienta ${def.name} (${created.tool_id})`);
   }
 
-  // 2) Tutores
-  for (const variant of TUTOR_VARIANTS) {
-    const spec = buildPalSpec(variant, base ?? { pal_id: baseId }, faceId);
-    const hash = specHash(spec);
-    const row = await db.tavusPal.findUnique({ where: { variant } });
-    const remote = row ? await client.getPal(row.palId) : null;
+  // 2) Tutores: adultos (Poly) y niños (Nuez)
+  const kidsFace = kidsFaceId();
+  for (const audience of TUTOR_AUDIENCES) {
+    const face = audience === "KIDS" ? kidsFace : faceId;
+    if (!face) {
+      console.log(`  · sin TAVUS_KIDS_FACE_ID: se omiten los tutores de niños`);
+      continue;
+    }
+    for (const variant of TUTOR_VARIANTS) {
+      const name = palName(variant, audience);
+      const spec = buildPalSpec(variant, audience, base ?? { pal_id: baseId }, face);
+      const hash = specHash(spec);
+      const key = { variant_audience: { variant, audience } };
+      const row = await db.tavusPal.findUnique({ where: key });
+      const remote = row ? await client.getPal(row.palId) : null;
 
-    if (row && remote && row.specHash === hash && !force) {
-      console.log(`  = ${palName(variant)} sin cambios (${row.palId})`);
-      if (!dryRun) {
-        await client.attachTools(row.palId, toolIds);
-        await attachMemory(client, base, row.palId);
+      if (row && remote && row.specHash === hash && !force) {
+        console.log(`  = ${name} sin cambios (${row.palId})`);
+        if (!dryRun) {
+          await client.attachTools(row.palId, toolIds);
+          await attachMemory(client, base, row.palId);
+        }
+        continue;
       }
-      continue;
-    }
-    if (dryRun) {
-      console.log(`  · ${row && remote ? "actualizaria" : "crearia"} ${palName(variant)}`);
-      continue;
-    }
+      if (dryRun) {
+        console.log(`  · ${row && remote ? "actualizaria" : "crearia"} ${name}`);
+        continue;
+      }
 
-    let palId: string;
-    if (row && remote) {
-      const ops = Object.entries(spec).map(([k, v]) => ({ op: "add", path: `/${k}`, value: v }));
-      await client.patchPal(row.palId, ops);
-      palId = row.palId;
-      console.log(`  ✔ actualizado ${palName(variant)} (${palId})`);
-    } else {
-      const created = await client.createPal(spec);
-      palId = created.pal_id;
-      console.log(`  ✔ creado ${palName(variant)} (${palId})`);
+      let palId: string;
+      if (row && remote) {
+        const ops = Object.entries(spec).map(([k, v]) => ({ op: "add", path: `/${k}`, value: v }));
+        await client.patchPal(row.palId, ops);
+        palId = row.palId;
+        console.log(`  ✔ actualizado ${name} (${palId})`);
+      } else {
+        const created = await client.createPal(spec);
+        palId = created.pal_id;
+        console.log(`  ✔ creado ${name} (${palId})`);
+      }
+      await client.attachTools(palId, toolIds);
+      await attachMemory(client, base, palId);
+      const data = { palId, faceId: face, basePalId: baseId, palName: name, specHash: hash, lastSyncedAt: new Date() };
+      await db.tavusPal.upsert({ where: key, create: { variant, audience, ...data }, update: data });
     }
-    await client.attachTools(palId, toolIds);
-    await attachMemory(client, base, palId);
-    await db.tavusPal.upsert({
-      where: { variant },
-      create: { variant, palId, faceId, basePalId: baseId, palName: palName(variant), specHash: hash, lastSyncedAt: new Date() },
-      update: { palId, faceId, basePalId: baseId, palName: palName(variant), specHash: hash, lastSyncedAt: new Date() },
-    });
   }
 
   // 3) Verificacion sin costo
@@ -116,11 +123,14 @@ async function main() {
     for (const row of await db.tavusPal.findMany()) {
       const conv = await client.createConversation({
         pal_id: row.palId,
-        conversation_name: `mypal:verify:${row.variant}`,
+        conversation_name: `mypal:verify:${row.audience}:${row.variant}`,
         test_mode: true,
         properties: { max_call_duration: 60, participant_absent_timeout: 15, participant_left_timeout: 5 },
       });
-      await db.tavusPal.update({ where: { variant: row.variant }, data: { lastVerifiedAt: new Date() } });
+      await db.tavusPal.update({
+        where: { variant_audience: { variant: row.variant, audience: row.audience } },
+        data: { lastVerifiedAt: new Date() },
+      });
       console.log(`  ✔ verificado ${row.palName}: conversacion ${conv.conversation_id} (${conv.status})`);
     }
   }

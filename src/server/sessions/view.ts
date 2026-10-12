@@ -13,6 +13,7 @@ export async function sessionView(sessionId: string, userId: string) {
     id: s.id,
     status: s.status,
     language: s.language,
+    audience: s.audience,
     isTrial: s.isTrial,
     lessonTitle: lesson?.titleEs ?? null,
     conversationId: joinable ? s.tavusConversationId : null,

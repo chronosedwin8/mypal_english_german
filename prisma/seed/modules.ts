@@ -1,12 +1,14 @@
-import { MODULES } from "@/content/modules";
+import { KIDS_MODULES, MODULES } from "@/content/modules";
 import { db } from "@/server/db";
 
 export async function seedModules() {
   let lessons = 0;
-  for (const [mi, m] of MODULES.entries()) {
+  const all = [...MODULES, ...KIDS_MODULES];
+  for (const [mi, m] of all.entries()) {
     const moduleId = `${m.lang.toLowerCase()}-${m.slug}`;
     const data = {
       lang: m.lang,
+      audience: m.audience ?? "ADULT",
       level: m.level,
       slug: m.slug,
       titleEs: m.titleEs,
@@ -33,5 +35,5 @@ export async function seedModules() {
       lessons++;
     }
   }
-  console.log(`✔ ${MODULES.length} módulos y ${lessons} lecciones`);
+  console.log(`✔ ${all.length} módulos y ${lessons} lecciones (incluye niños)`);
 }

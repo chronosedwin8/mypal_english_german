@@ -171,3 +171,8 @@
   .prose-mypal li { margin: 0.35rem 0; }
   .prose-mypal strong { color: var(--foreground); }
 }
+
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}

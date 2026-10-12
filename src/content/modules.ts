@@ -19,6 +19,7 @@ export interface LessonDef {
 export interface ModuleDef {
   slug: string;
   lang: "EN" | "DE";
+  audience?: "ADULT" | "KIDS";
   level: CefrLevel;
   emoji: string;
   titleEs: string;
@@ -412,6 +413,130 @@ export const MODULES: ModuleDef[] = [
         tutorBrief:
           "Debate a current topic (e.g. 4-Tage-Woche, Homeoffice). Take the opposite position and push the student to argue with connectors and subordinate clauses. Recast case and word-order errors.",
         suggestedMinutes: 12,
+      },
+    ],
+  },
+];
+
+/** Curriculo infantil (Nuez, la ardilla): juegos cortos con la camara. */
+export const KIDS_MODULES: ModuleDef[] = [
+  {
+    slug: "ninos-colores",
+    lang: "EN",
+    audience: "KIDS",
+    level: "A1",
+    emoji: "🎨",
+    titleEs: "Colores y formas",
+    descriptionEs: "Muéstrale tus juguetes a Nuez y aprende los colores.",
+    lessons: [
+      {
+        slug: "veo-veo",
+        titleEs: "Veo veo (I spy)",
+        objectives: ["Decir colores en inglés", "Jugar a adivinar objetos"],
+        targetVocab: ["red", "blue", "yellow", "green", "I spy", "circle", "square"],
+        tutorBrief: "VISION GAME. Play 'I spy with my little eye something red' using objects you can see. Let the child guess or show the object. Then swap roles. Celebrate every answer.",
+        usesVision: true,
+        suggestedMinutes: 8,
+      },
+    ],
+  },
+  {
+    slug: "ninos-animales",
+    lang: "EN",
+    audience: "KIDS",
+    level: "A1",
+    emoji: "🐶",
+    titleEs: "Animales",
+    descriptionEs: "Sonidos, nombres y peluches.",
+    lessons: [
+      {
+        slug: "sonidos",
+        titleEs: "¿Qué animal hace…?",
+        objectives: ["Nombrar animales", "Imitar sus sonidos"],
+        targetVocab: ["dog", "cat", "cow", "bird", "lion", "fish"],
+        tutorBrief: "Make animal sounds and ask the child to guess the animal in English. If they have stuffed animals or toys, ask them to show them and name them together.",
+        usesVision: true,
+        suggestedMinutes: 8,
+      },
+    ],
+  },
+  {
+    slug: "ninos-numeros",
+    lang: "EN",
+    audience: "KIDS",
+    level: "A1",
+    emoji: "🔢",
+    titleEs: "Números con los dedos",
+    descriptionEs: "Contar del 1 al 10 jugando.",
+    lessons: [
+      {
+        slug: "contar",
+        titleEs: "Cuenta conmigo",
+        objectives: ["Contar del 1 al 10", "Mostrar números con los dedos"],
+        targetVocab: ["one", "two", "three", "four", "five", "how many?"],
+        tutorBrief: "Count to ten together. Ask the child to show numbers with their fingers to the camera and say them. Count objects you can see (pencils, toys).",
+        usesVision: true,
+        suggestedMinutes: 6,
+      },
+    ],
+  },
+  {
+    slug: "ninos-comida",
+    lang: "EN",
+    audience: "KIDS",
+    level: "A1",
+    emoji: "🍎",
+    titleEs: "Frutas y comida",
+    descriptionEs: "Lo que me gusta y lo que no.",
+    lessons: [
+      {
+        slug: "me-gusta",
+        titleEs: "I like apples!",
+        objectives: ["Nombrar frutas", "Decir lo que te gusta"],
+        targetVocab: ["apple", "banana", "orange", "I like", "I don't like", "yummy"],
+        tutorBrief: "Talk about favourite fruits and food with 'I like...'. If the child shows a fruit or snack to the camera, name it together and ask its colour.",
+        usesVision: true,
+        suggestedMinutes: 6,
+      },
+    ],
+  },
+  {
+    slug: "kinder-farben",
+    lang: "DE",
+    audience: "KIDS",
+    level: "A1",
+    emoji: "🎨",
+    titleEs: "Colores en alemán",
+    descriptionEs: "Rot, blau, gelb… con tus juguetes.",
+    lessons: [
+      {
+        slug: "ich-sehe",
+        titleEs: "Ich sehe was, was du nicht siehst",
+        objectives: ["Decir colores en alemán", "Jugar al veo veo"],
+        targetVocab: ["rot", "blau", "gelb", "grün", "der Ball", "das Spielzeug"],
+        tutorBrief: "VISION GAME in German: play 'Ich sehe was, was du nicht siehst, und das ist rot!' with objects you can see. Always say nouns with their article.",
+        usesVision: true,
+        suggestedMinutes: 8,
+      },
+    ],
+  },
+  {
+    slug: "kinder-tiere",
+    lang: "DE",
+    audience: "KIDS",
+    level: "A1",
+    emoji: "🐱",
+    titleEs: "Animales en alemán",
+    descriptionEs: "Der Hund, die Katze… y sus sonidos.",
+    lessons: [
+      {
+        slug: "tiere",
+        titleEs: "Welches Tier ist das?",
+        objectives: ["Nombrar animales con su artículo"],
+        targetVocab: ["der Hund", "die Katze", "die Kuh", "der Vogel", "der Fisch"],
+        tutorBrief: "Make animal sounds and let the child guess the animal in German. Name stuffed animals they show, always with the article.",
+        usesVision: true,
+        suggestedMinutes: 8,
       },
     ],
   },
