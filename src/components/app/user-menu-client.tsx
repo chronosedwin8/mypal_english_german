@@ -8,6 +8,7 @@ import { useTheme } from "next-themes";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -40,10 +41,12 @@ export function UserMenuClient({
         {initial}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-60">
-        <DropdownMenuLabel className="font-normal">
-          <p className="font-semibold">{name}</p>
-          <p className="truncate text-xs text-muted-foreground">{email}</p>
-        </DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="font-normal">
+            <p className="font-semibold">{name}</p>
+            <p className="truncate text-xs text-muted-foreground">{email}</p>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         {isAdmin && (
           <DropdownMenuItem render={<Link href="/admin" />}>

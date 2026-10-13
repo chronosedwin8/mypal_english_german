@@ -18,7 +18,7 @@ export async function MinutesPill() {
   const hasFreeClass = balance.trialAvailableSeconds > 0 || (!claim && config["trial.enabled"]);
   return (
     <Link
-      href="/app/planes"
+      href={hasFreeClass && minutes === 0 ? "/app/clase" : "/app/planes"}
       className="flex items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-semibold shadow-sm hover:bg-muted"
       title="Minutos disponibles con tu tutor"
     >
