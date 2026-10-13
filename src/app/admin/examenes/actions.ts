@@ -7,29 +7,11 @@ import { z } from "zod";
 import { EXAM_CODES } from "@/content/exams";
 import { requireAdmin } from "@/server/auth/dal";
 import { db } from "@/server/db";
-import { bankTargets } from "@/server/exams/bank/targets";
 import { calibrateBank } from "@/server/exams/calibration";
 import { assembleForm } from "@/server/exams/forms";
 import { enqueue } from "@/server/jobs/queue";
 
 const ExamCodeSchema = z.enum(EXAM_CODES as [string, ...string[]]);
-
-export async function enqueueGeneration(formData: FormData) {
-  const admin = await requireAdmin();
-  const input = z
-    .object({
-      exam: ExamCodeSchema,
-      section: z.enum(["LISTENING", "READING", "WRITING", "SPEAKING"]),
-      part: z.coerce.number().int().min(1),
-      count: z.coerce.number().int().min(1).max(5).default(1),
-    })
-    .parse(Object.fromEntries(formData));
-  if (!bankTargets(input.exam as never).some((t) => t.section === input.section && t.part === input.part))
-    throw new Error("Esa parte no se genera en el banco");
-  for (let i = 0; i < input.count; i++) await enqueue("bank.generate", { exam: input.exam, section: input.section, part: input.part });
-  await db.auditLog.create({ data: { actorUserId: admin.id, action: "bank.enqueue", entity: "ExamItemSet", after: input } });
-  revalidatePath("/admin/examenes");
-}
 
 export async function buildForm(formData: FormData) {
   const admin = await requireAdmin();

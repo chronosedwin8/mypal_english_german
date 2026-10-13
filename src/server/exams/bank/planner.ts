@@ -1,12 +1,9 @@
 /**
- * Inventario del banco y reposicion: si una parte tiene menos bloques publicables
- * que `exam.bank.minPerPart`, se encolan trabajos `bank.generate` (sin duplicar los
- * que ya estan en cola).
+ * Inventario del banco por examen, seccion y parte. El contenido del banco lo escribe
+ * el equipo y se carga con `pnpm bank import`; la API de IA no se usa para crearlo.
  */
 import type { ExamCode } from "@/content/exams/types";
-import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
-import { enqueue } from "@/server/jobs/queue";
 
 import { BANK_EXAMS, bankTargets, type BankTarget } from "./targets";
 
@@ -46,22 +43,4 @@ export async function bankInventory(exams: ExamCode[] = BANK_EXAMS): Promise<Inv
       };
     }),
   );
-}
-
-/** Encola lo que falta para llegar al minimo por parte. Devuelve cuantos trabajos encolo. */
-export async function planBankGaps(opts: { maxJobs?: number } = {}): Promise<number> {
-  const config = await getConfig();
-  const min = config["exam.bank.minPerPart"];
-  const enabled = config["exam.enabledExams"].filter((e) => BANK_EXAMS.includes(e));
-  let budget = opts.maxJobs ?? 6;
-  let created = 0;
-  for (const row of await bankInventory(enabled)) {
-    // Los borradores esperan audio: cuentan como inventario en camino.
-    const need = min - (row.approved + row.review + row.draft) - row.pending;
-    for (let i = 0; i < need && budget > 0; i++, budget--) {
-      await enqueue("bank.generate", { exam: row.exam, section: row.section, part: row.part });
-      created++;
-    }
-  }
-  return created;
 }

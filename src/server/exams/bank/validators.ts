@@ -198,8 +198,8 @@ function validateGroups(groups: QuestionGroup[], source: string, section: Sectio
       issues.push(`${g.taskType} must not have sharedOptions.`);
     }
     if (isCompletion && !g.wordLimit) issues.push(`${g.taskType} needs wordLimit (e.g. NO MORE THAN TWO WORDS).`);
-    if (isCompletion && g.wordLimit && !/\b(ONE|TWO|THREE|FOUR)\s+WORDS?\b/i.test(g.instructions))
-      issues.push(`${g.taskType}: instructions must state the word limit in capitals (e.g. NO MORE THAN TWO WORDS).`);
+    if (isCompletion && g.wordLimit && !/\b(ONE|TWO|THREE|FOUR)\s+WORDS?\b|\b(EIN|ZWEI|DREI|VIER)\s+(WORT|WÖRTER)(?!\p{L})/iu.test(g.instructions))
+      issues.push(`${g.taskType}: instructions must state the word limit in capitals (e.g. NO MORE THAN TWO WORDS / HÖCHSTENS ZWEI WÖRTER).`);
     if (judgement && g.questions.length >= 4) {
       const counts = new Map<string, number>();
       for (const q of g.questions) counts.set(q.answers[0], (counts.get(q.answers[0]) ?? 0) + 1);

@@ -10,7 +10,8 @@ test("banco de examenes: inventario, bloques y detalle", async ({ page }) => {
   await page.goto("/admin/examenes?estado=ALL");
   await expect(page.getByRole("heading", { name: "Banco de exámenes" })).toBeVisible({ timeout: 90_000 });
   await expect(page.getByText("Inventario por parte")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Generar" }).first()).toBeVisible();
+  await expect(page.getByText("pnpm bank import")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Generar" })).toHaveCount(0);
   await page.screenshot({ path: "test-results/admin-examenes.png", fullPage: true });
 
   // Un bloque de Reading: texto, preguntas y clave con evidencia.

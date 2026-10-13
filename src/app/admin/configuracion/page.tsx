@@ -46,7 +46,6 @@ const LABELS: Partial<Record<ConfigKey, string>> = {
   "exam.enabled": "Exámenes activos",
   "exam.enabledExams": "Exámenes disponibles (JSON)",
   "exam.bank.minPerPart": "Bloques aprobados mínimos por parte",
-  "exam.bank.autoGenerate": "El worker repone el banco automáticamente (gasta IA)",
   "exam.bank.humanReviewSample": "Fracción de bloques que va a revisión humana (0–1)",
   "exam.bank.judgeMinScore": "Puntaje mínimo del juez para publicar (0–10)",
   "exam.bank.reviewBelowClarity": "Claridad bajo la cual un bloque va a revisión (0–10)",

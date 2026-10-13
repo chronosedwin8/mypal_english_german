@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils";
 import { examBankOverview } from "@/server/admin/exams";
 import { requireStaff } from "@/server/auth/dal";
 
-import { buildForm, enqueueGeneration } from "./actions";
+import { buildForm } from "./actions";
 
 export const metadata = { title: "Admin · Exámenes" };
 
@@ -48,9 +48,8 @@ async function Bank({ searchParams }: { searchParams: PageProps<"/admin/examenes
         <div>
           <h1 className="font-heading text-3xl font-extrabold">Banco de exámenes</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Generación con Gemini, validación con código, resolutor a ciegas, juez de estilo y audio con ElevenLabs.
-            Mínimo por parte: <b>{config.minPerPart}</b> · reposición automática:{" "}
-            <b>{config.autoGenerate ? "activa" : "apagada"}</b> (se cambia en Configuración).
+            Contenido escrito por el equipo y cargado con <code>pnpm bank import</code>: validación con código y audio con
+            ElevenLabs verificado con Scribe. Mínimo por parte: <b>{config.minPerPart}</b>.
           </p>
         </div>
         <Link href="/admin/calibracion" className="text-sm font-medium text-primary hover:underline">
@@ -84,7 +83,6 @@ async function Bank({ searchParams }: { searchParams: PageProps<"/admin/examenes
                 <th className="text-right">Borrador</th>
                 <th className="text-right">Rechazados</th>
                 <th className="text-right">En cola</th>
-                <th />
               </tr>
             </thead>
             <tbody>
@@ -100,23 +98,6 @@ async function Bank({ searchParams }: { searchParams: PageProps<"/admin/examenes
                     <td className="text-right tabular-nums">{r.draft}</td>
                     <td className="text-right tabular-nums text-muted-foreground">{r.rejected}</td>
                     <td className="text-right tabular-nums">{r.pending}</td>
-                    <td className="p-2 text-right">
-                      <form action={enqueueGeneration} className="inline-flex items-center gap-2">
-                        <input type="hidden" name="exam" value={r.exam} />
-                        <input type="hidden" name="section" value={r.section} />
-                        <input type="hidden" name="part" value={r.part} />
-                        <select name="count" defaultValue="1" className="h-8 rounded-lg border bg-background px-2 text-xs" aria-label="Cantidad">
-                          {[1, 2, 3, 5].map((n) => (
-                            <option key={n} value={n}>
-                              {n}
-                            </option>
-                          ))}
-                        </select>
-                        <Button type="submit" size="sm" variant="outline">
-                          Generar
-                        </Button>
-                      </form>
-                    </td>
                   </tr>
                 );
               })}

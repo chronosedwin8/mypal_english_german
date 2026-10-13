@@ -4,6 +4,10 @@
  *   → si algo falla, una correccion y se repite → guardar → audio (Listening)
  *   → aprobado (o a revision humana segun la muestra configurada).
  * Lo que no pasa queda RECHAZADO con sus problemas (sirve para medir costo y calidad).
+ *
+ * NO se usa para llenar el banco: el banco lo escribe el equipo y se carga con
+ * `pnpm bank import` (ver import.ts). Este pipeline queda como base de la generacion
+ * al momento (`exam.adhoc`), que si es un uso de la API en tiempo real.
  */
 import { randomUUID } from "node:crypto";
 
@@ -384,6 +388,8 @@ export async function attachAudio(
     return { status: "REJECTED", issues, costMicroUsd: cost };
   }
   await db.examItemSet.update({ where: { id: itemSetId }, data: { reviewNote: null } });
-  if (opts.publishWhenOk && item.status === "DRAFT") await publish(itemSetId, config["exam.bank.humanReviewSample"]);
+  // Los bloques escritos por el equipo (importados) no pasan por la muestra aleatoria de revision.
+  const authored = (item.answerKey as { source?: { kind?: string } } | null)?.source?.kind === "authored";
+  if (opts.publishWhenOk && item.status === "DRAFT") await publish(itemSetId, authored ? 0 : config["exam.bank.humanReviewSample"]);
   return { status: "OK", issues: [], costMicroUsd: cost };
 }

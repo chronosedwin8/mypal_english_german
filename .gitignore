@@ -52,3 +52,6 @@ next-env.d.ts
 
 # buzon de correo de desarrollo
 /.dev-mail/
+
+# Banco de examenes escrito por el equipo (contiene claves de respuesta; el repo es publico)
+/bank-src/

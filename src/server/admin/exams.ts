@@ -40,7 +40,6 @@ export async function examBankOverview(status: ItemSetStatus | "ALL") {
   return {
     config: {
       minPerPart: config["exam.bank.minPerPart"],
-      autoGenerate: config["exam.bank.autoGenerate"],
       dailyBudgetUsd: config["ai.dailyBudgetUsd"],
       monthlyCharBudget: config["voice.monthlyCharBudget"],
     },

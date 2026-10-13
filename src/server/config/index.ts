@@ -69,8 +69,6 @@ export const CONFIG_SCHEMA = {
     .default(["IELTS_ACADEMIC", "GOETHE_B1", "GOETHE_B2", "GOETHE_C1", "TESTDAF"]),
   /** Bloques aprobados minimos por examen/seccion/parte; el worker repone si baja. */
   "exam.bank.minPerPart": z.number().int().min(0).max(200).default(3),
-  /** El worker genera banco automaticamente (gasta IA). Apagado = solo con script o admin. */
-  "exam.bank.autoGenerate": z.boolean().default(false),
   /** Fraccion de bloques aprobados que pasan a revision humana. */
   "exam.bank.humanReviewSample": z.number().min(0).max(1).default(0.2),
   "exam.bank.judgeMinScore": z.number().min(0).max(10).default(7),

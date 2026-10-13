@@ -27,7 +27,7 @@ export const TESTDAF: ExamSpec = {
         { part: 4, title: "Aufgabe 4", description: "Classify statements (pro/contra/neutral).", taskTypes: ["MATCHING"], items: 5, minutes: 8, words: [450, 600] },
         { part: 5, title: "Aufgabe 5", description: "Match speech acts.", taskTypes: ["MATCHING"], items: 4, minutes: 8, words: [300, 400] },
         { part: 6, title: "Aufgabe 6", description: "Match pairs of concepts.", taskTypes: ["MATCHING"], items: 4, minutes: 8, words: [300, 400] },
-        { part: 7, title: "Aufgabe 7", description: "Find errors in a summary.", taskTypes: ["TRUE_FALSE_NOT_GIVEN"], items: 5, minutes: 8, words: [500, 650] },
+        { part: 7, title: "Aufgabe 7", description: "Find errors in a summary (richtig/falsch).", taskTypes: ["RICHTIG_FALSCH"], items: 5, minutes: 8, words: [500, 650] },
       ],
     },
     {
@@ -37,7 +37,7 @@ export const TESTDAF: ExamSpec = {
       rawMax: 30,
       parts: [
         { part: 1, title: "Aufgabe 1", description: "Short answers on a conversation.", taskTypes: ["SHORT_ANSWER"], items: 5, minutes: 5, plays: 1, speakers: 2, words: [300, 400] },
-        { part: 2, title: "Aufgabe 2", description: "Find errors in a summary.", taskTypes: ["TRUE_FALSE_NOT_GIVEN"], items: 4, minutes: 6, plays: 1, speakers: 1, words: [400, 500] },
+        { part: 2, title: "Aufgabe 2", description: "Find errors in a summary (richtig/falsch).", taskTypes: ["RICHTIG_FALSCH"], items: 4, minutes: 6, plays: 1, speakers: 1, words: [400, 500] },
         { part: 3, title: "Aufgabe 3", description: "Match people and statements.", taskTypes: ["WHO_SAYS"], items: 4, minutes: 6, plays: 1, speakers: 3, words: [450, 550] },
         { part: 4, title: "Aufgabe 4", description: "Multiple choice on a lecture (with slides).", taskTypes: ["MCQ_SINGLE"], items: 5, minutes: 7, plays: 1, speakers: 1, words: [550, 700] },
         { part: 5, title: "Aufgabe 5", description: "Note completion on a lecture (with slides).", taskTypes: ["NOTE_COMPLETION"], items: 4, minutes: 6, plays: 1, speakers: 1, words: [550, 700] },

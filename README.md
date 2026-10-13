@@ -86,12 +86,13 @@ En local los correos no se envían: ábrelos en **http://localhost:3000/dev/corr
 | `pnpm typecheck` · `pnpm lint` · `pnpm build` | Calidad y build de producción |
 | `pnpm check:pricing` | Verifica el margen de todos los productos |
 | `pnpm tavus:setup [--dry-run] [--verify] [--force]` | Crea/actualiza los tutores en Tavus |
-| `pnpm bank inventory \| generate \| fill \| form \| audio` | Banco de exámenes desde la terminal (también desde `/admin/examenes`) |
+| `pnpm bank inventory \| import \| form \| audio` | Banco de exámenes: el contenido lo escribe el equipo en `bank-src/` (fuera de git) y se carga con `pnpm bank import bank-src/...` |
 | `pnpm s3:setup [--check]` | Crea o verifica el bucket privado de audios |
 | `pnpm admin:create` · `pnpm admin:promote` | Cuenta de administrador |
 
 ### Operación de exámenes (worker)
 
+- **Banco**: la API de IA no se usa para crear preguntas ni guiones. Cada bloque se escribe en JSON (`bank-src/`, fuera de git porque contiene las claves de respuesta), `pnpm bank import` lo valida con código, genera y verifica el audio de Listening/Hören y lo aprueba. `--dry-run` valida sin guardar.
 - **Calibración diaria** (`/admin/calibracion`, botón *Calibrar ahora*): Rasch con las respuestas reales. Con `exam.calibration.minResponses` respuestas por pregunta se guardan su dificultad y discriminación. Las preguntas defectuosas mandan su bloque a revisión y dejan una alerta en Moderación. Las formas IELTS completas reciben su propia tabla de conversión, que los simulacros usan desde ese momento.
 - **Precisión**: el simulador frente a las notas oficiales que reportan los estudiantes (meta ±0,5 banda) y la IA frente a los docentes. Si el sesgo es claro, ajusta `exam.grader.ieltsWritingOffset` / `ieltsSpeakingOffset`.
 - **Grabaciones de Speaking**: se borran al vencer el plazo de la institución (o `exam.recordings.retentionDays` sin institución). Cada persona puede borrarlas antes en `/app/seguridad`. Se conservan la transcripción y la nota.
@@ -114,6 +115,6 @@ En local los correos no se envían: ábrelos en **http://localhost:3000/dev/corr
 - Desplegar el worker como proceso permanente y configurar `PUBLIC_WEBHOOK_URL`.
 - Hacer las llamadas de calibración reales (ver `docs/PLAN.md`, fase 6) y confirmar el costo por minuto en el panel de Tavus.
 - Rotar las claves de AWS (también se compartieron en texto plano).
-- Completar el banco de alemán (`pnpm bank fill` cuando haya presupuesto diario de IA) y armar formas de simulacro.
+- Ampliar el banco (hoy hay una forma completa de simulacro por examen alemán; IELTS necesita completar algunas partes) escribiendo más bloques en `bank-src/` e importándolos.
 - Configurar `MINORS_AI_DRIVER` antes de vender a colegios con estudiantes menores.
 - Piloto con 20–30 estudiantes reales para calibrar formas y comparar con notas oficiales y de docentes.

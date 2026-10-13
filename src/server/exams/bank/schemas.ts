@@ -88,7 +88,7 @@ export const ReadingBlockSchema = z.object({
     title: z.string().min(3),
     paragraphs: z.array(Paragraph).min(4).max(10),
   }),
-  groups: z.array(Group).min(2).max(4),
+  groups: z.array(Group).min(1).max(8),
 });
 export type ReadingBlock = z.infer<typeof ReadingBlockSchema>;
 
@@ -134,7 +134,7 @@ export const ListeningBlockSchema = z.object({
   speakers: z.array(Speaker).min(1).max(4),
   segments: z.array(Segment).min(1).max(2).describe("Audio is split where the candidate gets reading time"),
   map: MapSpec.nullable(),
-  groups: z.array(Group).min(1).max(4),
+  groups: z.array(Group).min(1).max(10),
 });
 export type ListeningBlock = z.infer<typeof ListeningBlockSchema>;
 

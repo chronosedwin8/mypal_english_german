@@ -3,7 +3,6 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { fakeAi } from "@/server/ai/fake";
 import { invalidateConfigCache, setConfig } from "@/server/config";
 import { db } from "@/server/db";
-import { planBankGaps } from "@/server/exams/bank/planner";
 import { produceBlock } from "@/server/exams/bank/pipeline";
 import { bankTargets } from "@/server/exams/bank/targets";
 import { assembleForm } from "@/server/exams/forms";
@@ -130,13 +129,7 @@ describe("pipeline del banco", () => {
 });
 
 describe("reposicion y formas", () => {
-  it("encola lo que falta sin duplicar y el worker lo procesa", async () => {
-    await setConfig("exam.bank.minPerPart", 1, null);
-    await setConfig("exam.enabledExams", ["IELTS_ACADEMIC"], null);
-    expect(await planBankGaps({ maxJobs: 20 })).toBe(bankTargets("IELTS_ACADEMIC").length);
-    expect(await planBankGaps({ maxJobs: 20 })).toBe(0); // ya estan en cola
-
-    await db.examJob.deleteMany({});
+  it("el worker procesa un trabajo de generación", async () => {
     happyPath("reading");
     const job = await enqueue("bank.generate", { exam: "IELTS_ACADEMIC", section: "READING", part: 1 });
     expect(await processJobs(2)).toBe(1);

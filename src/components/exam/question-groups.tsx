@@ -42,6 +42,8 @@ export function QuestionGroups(props: {
   disabled?: boolean;
   onAnswer: (number: number, value: string, opts?: { immediate?: boolean }) => void;
   onFlag: (number: number) => void;
+  /** idioma del examen: el encabezado de cada grupo va en ese idioma */
+  language?: "en" | "de";
 }) {
   const groups = props.groups
     .map((g) => ({ ...g, questions: g.questions.filter((q) => props.include.includes(q.number)) }))
@@ -56,7 +58,7 @@ export function QuestionGroups(props: {
           <section key={gi} className="space-y-4">
             <div>
               <p className="text-sm font-bold">
-                Questions {Math.min(...nums)}
+                {props.language === "de" ? (nums.length > 1 ? "Aufgaben" : "Aufgabe") : "Questions"} {Math.min(...nums)}
                 {nums.length > 1 && `–${Math.max(...nums)}`}
               </p>
               <p className="mt-1 text-sm text-muted-foreground">{g.instructions}</p>

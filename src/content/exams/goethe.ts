@@ -130,7 +130,7 @@ export const GOETHE_C1: ExamSpec = {
     hoeren([
       { part: 1, title: "Teil 1", description: "Phone message or conversation: note completion.", taskTypes: ["NOTE_COMPLETION"], items: 7, minutes: 8, plays: 1, speakers: 2, words: [350, 450] },
       { part: 2, title: "Teil 2", description: "Radio interview: multiple choice.", taskTypes: ["MCQ_SINGLE"], items: 10, minutes: 12, plays: 2, speakers: 2, words: [700, 850] },
-      { part: 3, title: "Teil 3", description: "Five short statements: match.", taskTypes: ["MATCHING"], items: 5, minutes: 8, plays: 2, speakers: 1, words: [400, 500] },
+      { part: 3, title: "Teil 3", description: "Five short statements by different people: match.", taskTypes: ["MATCHING"], items: 5, minutes: 8, plays: 2, speakers: 3, words: [400, 500] },
       { part: 4, title: "Teil 4", description: "Lecture: note completion.", taskTypes: ["NOTE_COMPLETION"], items: 8, minutes: 12, plays: 2, speakers: 1, words: [700, 900] },
     ]),
     {

@@ -191,6 +191,7 @@ export function ExamScreen({ view }: { view: PracticeView }) {
             blockId={b.id}
             groups={content.groups}
             include={b.questionNumbers}
+            language={view.exam === "IELTS_ACADEMIC" ? "en" : "de"}
             map={content.map}
             answers={answers[b.id] ?? {}}
             flagged={flagged}

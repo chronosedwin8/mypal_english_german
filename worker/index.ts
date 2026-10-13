@@ -9,7 +9,6 @@ import { Client } from "pg";
 
 import { getConfig } from "@/server/config";
 import { db } from "@/server/db";
-import { planBankGaps } from "@/server/exams/bank/planner";
 import { calibrateBank } from "@/server/exams/calibration";
 import { syncOpenMocks } from "@/server/exams/mock";
 import { closeExpiredPractice } from "@/server/exams/practice";
@@ -57,16 +56,6 @@ const loops: Loop[] = [
   { name: "exam-calibrate", everyMs: 24 * 60 * 60_000, run: () => calibrateBank() },
   /** Grabaciones de Speaking vencidas segun el plazo de cada institucion. */
   { name: "exam-recordings", everyMs: 24 * 60 * 60_000, run: () => purgeExpiredRecordings() },
-  {
-    name: "exam-bank",
-    everyMs: 15 * 60_000,
-    run: async () => {
-      const config = await getConfig();
-      if (!config["exam.enabled"] || !config["exam.bank.autoGenerate"]) return;
-      const n = await planBankGaps();
-      if (n) console.log(`[worker] banco: ${n} bloques encolados`);
-    },
-  },
   {
     name: "invariants",
     everyMs: 6 * 60 * 60_000,
